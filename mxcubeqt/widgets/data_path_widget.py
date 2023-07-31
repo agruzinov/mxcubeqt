@@ -229,7 +229,7 @@ class DataPathWidget(qt_import.QWidget):
         if self._data_model.precision:
             precision = self._data_model.precision
         else:
-            precision = "05"
+            precision = "5"
 
         self.set_directory(dir_name)
         file_name = file_name.replace(
