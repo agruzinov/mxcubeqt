@@ -42,6 +42,7 @@ class ShutterBrick(BaseWidget):
         # Properties ----------------------------------------------------------
         self.add_property("title", "string", "Shutter")
         self.add_property("hwobj_shutter", "string", "")
+        self.add_property("control_only_expert", "boolean", False)
 
         # Signals -------------------------------------------------------------
 
@@ -51,6 +52,8 @@ class ShutterBrick(BaseWidget):
         self.shutter_hwobj = None
 
         # Internal values -----------------------------------------------------
+        self.expert_control = False
+        self.expert = False
 
         # Graphic elements ----------------------------------------------------
         self.main_groupbox = qt_import.QGroupBox("Shutter", self)
@@ -93,7 +96,23 @@ class ShutterBrick(BaseWidget):
         self.close_button.clicked.connect(self.close_button_clicked)
 
         # Other ---------------------------------------------------------------
+        self.set_expert_mode(False)
 
+    def set_expert_mode(self, expert=None):
+
+        if expert is not None:
+            self.expert = expert
+
+
+        if not self.expert_control:
+            self.button_widget.show()
+            return
+
+        if not self.expert:
+            self.button_widget.hide()
+        else:
+            self.button_widget.show()
+        
     def open_button_clicked(self):
         """Opens the shutter"""
         self.shutter_hwobj.open()
@@ -114,14 +133,34 @@ class ShutterBrick(BaseWidget):
                 self.connect(
                     self.shutter_hwobj, "valueChanged", self.value_changed
                 )
+                self.main_groupbox.setTitle(self.shutter_hwobj.username)
+                self.value_changed()
         elif property_name == "title":
             self.main_groupbox.setTitle(new_value)
+        elif property_name == "control_only_expert":
+            self.expert_control = new_value 
+            self.set_expert_mode()
         else:
             BaseWidget.property_changed(self, property_name, old_value, new_value)
 
-    def value_changed(self, value):
+    def value_changed(self, value=None):
         """Based on the shutter state enables/disables open and close buttons"""
-        colors.set_widget_color_by_state(self.state_label, value)
+
+
+        if value is None:
+            value = self.shutter_hwobj.get_value()
+
+        state_str = value.name
+        if value.name == 'OPEN':
+           colors.set_widget_color(self.state_label, colors.LIGHT_GREEN)
+        elif value.name == 'CLOSED':
+           colors.set_widget_color(self.state_label, colors.LIGHT_GRAY)
+        elif value.name == 'MOVING':
+           colors.set_widget_color(self.state_label, colors.LIGHT_YELLOW)
+        else:
+           colors.set_widget_color(self.state_label, colors.DARK_GRAY)
+
+        # colors.set_widget_color_by_state(self.state_label, value)
         self.state_label.setText(value.value.title())
         self.setDisabled(value.name == "DISABLED")
         is_open = self.shutter_hwobj.is_open
