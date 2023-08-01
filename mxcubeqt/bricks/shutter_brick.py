@@ -24,7 +24,9 @@ Interface is based on the AbstractNState hardware object
 
 from mxcubeqt.utils import colors, icons, qt_import
 from mxcubeqt.base_components import BaseWidget
+import logging
 
+log = logging.getLogger("HWR")
 
 __credits__ = ["MXCuBE collaboration"]
 __license__ = "LGPLv3+"
