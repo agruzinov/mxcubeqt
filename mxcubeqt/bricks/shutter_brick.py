@@ -162,5 +162,9 @@ class ShutterBrick(BaseWidget):
         self.state_label.setText(value.value.title())
         self.setDisabled(value.name == "DISABLED")
         is_open = self.shutter_hwobj.is_open
+        if is_open == "OPEN":
+            is_open = True
+        else:
+            is_open = False
         self.open_button.setEnabled(not is_open)
         self.close_button.setEnabled(is_open)
