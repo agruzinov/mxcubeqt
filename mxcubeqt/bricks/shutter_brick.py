@@ -10,10 +10,10 @@
 #  (at your option) any later version.
 #
 #  MXCuBE is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  but WITHOUT ANY WARRANTY; wthout even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU Lesser General Public License for more details.
-#
+
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with MXCuBE.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -62,17 +62,17 @@ class ShutterBrick(BaseWidget):
         self.state_label.setAlignment(qt_import.Qt.AlignCenter)
         self.state_label.setFixedHeight(24)
         colors.set_widget_color(self.state_label, colors.LIGHT_GRAY)
-        _button_widget = qt_import.QWidget(self.main_groupbox)
+        self._button_widget = qt_import.QWidget(self.main_groupbox)
 
         self.open_button = qt_import.QPushButton(
-            icons.load_icon("ShutterOpen"), "Open", _button_widget
+            icons.load_icon("ShutterOpen"), "Open", self._button_widget
         )
         self.close_button = qt_import.QPushButton(
-            icons.load_icon("ShutterClose"), "Close", _button_widget
+            icons.load_icon("ShutterClose"), "Close", self._button_widget
         )
 
         # Layout --------------------------------------------------------------
-        _button_widget_hlayout = qt_import.QHBoxLayout(_button_widget)
+        _button_widget_hlayout = qt_import.QHBoxLayout(self._button_widget)
         _button_widget_hlayout.addWidget(self.open_button)
         _button_widget_hlayout.addWidget(self.close_button)
         _button_widget_hlayout.setSpacing(2)
@@ -80,7 +80,7 @@ class ShutterBrick(BaseWidget):
 
         _main_gbox_vlayout = qt_import.QVBoxLayout(self.main_groupbox)
         _main_gbox_vlayout.addWidget(self.state_label)
-        _main_gbox_vlayout.addWidget(_button_widget)
+        _main_gbox_vlayout.addWidget(self._button_widget)
         _main_gbox_vlayout.setSpacing(2)
         _main_gbox_vlayout.setContentsMargins(2, 2, 2, 2)
 
@@ -99,19 +99,17 @@ class ShutterBrick(BaseWidget):
         self.set_expert_mode(False)
 
     def set_expert_mode(self, expert=None):
-
         if expert is not None:
             self.expert = expert
 
-
         if not self.expert_control:
-            self.button_widget.show()
+            self._button_widget.show()  # <-- Used self._button_widget instead of _button_widget
             return
 
         if not self.expert:
-            self.button_widget.hide()
+            self._button_widget.hide()  # <-- Used self._button_widget instead of _button_widget
         else:
-            self.button_widget.show()
+            self._button_widget.show()
         
     def open_button_clicked(self):
         """Opens the shutter"""
