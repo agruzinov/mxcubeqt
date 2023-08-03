@@ -25,6 +25,7 @@ from mxcubeqt.widgets.task_toolbox_widget import TaskToolBoxWidget
 
 from mxcubecore import HardwareRepository as HWR
 
+
 __credits__ = ["MXCuBE collaboration"]
 __license__ = "LGPLv3+"
 __category__ = "General"
