@@ -99,6 +99,11 @@ class ProposalBrick(BaseWidget):
 
         # Graphic elements ----------------------------------------------------
         self.main_gbox = qt_import.QGroupBox("ISPyB proposal", self)
+        self.message_widget = qt_import.QLabel()
+        self.message_widget.hide() 
+
+
+
 
         self.login_as_proposal_widget = qt_import.QWidget(self.main_gbox)
         code_label = qt_import.QLabel("  Code: ", self.login_as_proposal_widget)
