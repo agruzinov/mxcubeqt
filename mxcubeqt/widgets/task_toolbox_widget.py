@@ -19,6 +19,7 @@
 
 import logging
 import importlib
+import re
 
 from mxcubeqt.utils import icons, queue_item, qt_import
 from mxcubeqt.widgets.create_discrete_widget import CreateDiscreteWidget
