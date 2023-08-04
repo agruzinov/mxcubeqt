@@ -177,11 +177,14 @@ class ConfirmDialog(qt_import.QDialog):
                     int(path_template.precision) * "#",
                 )
                 file_name = file_name.strip(" ")
+                print("========= ", acq_parameters)
+                print("========= ", acq_parameters)
+
                 info_str_list.append(file_name)
                 info_str_list.append("%.3f keV" % acq_parameters.energy)
                 info_str_list.append("%.2f A" % acq_parameters.resolution)
                 info_str_list.append("%.2f %%" % acq_parameters.transmission)
-                info_str_list.append("%.1f" % acq_parameters.osc_start)
+                #info_str_list.append("%.1f" % acq_parameters.osc_start)
                 info_str_list.append(str(acq_parameters.osc_range))
                 info_str_list.append(str(acq_parameters.num_images))
                 info_str_list.append("%s s" % str(acq_parameters.exp_time))
