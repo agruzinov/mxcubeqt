@@ -498,8 +498,10 @@ class AcquisitionWidget(qt_import.QWidget):
         self.set_tunable_energy(HWR.beamline.tunable_wavelength)
 
         has_shutter_less = HWR.beamline.detector.has_shutterless()
-        self.acq_widget_layout.shutterless_cbx.setEnabled(has_shutter_less)
+        self.acq_widget_layout.shutterless_cbx.setEnabled(False)
         self.acq_widget_layout.shutterless_cbx.setChecked(has_shutter_less)
+
+
 
         if HWR.beamline.disable_num_passes:
             num_passes = self.acq_widget_layout.findChild(
