@@ -32,7 +32,6 @@ __category__ = "DESY"
 
 
 class P11DeiceBrick(DuoStateBrick):
-
     STATES = {
         "unknown": (colors.LIGHT_GRAY, True, True, False, False),
         "disabled": (colors.LIGHT_GRAY, False, False, False, False),

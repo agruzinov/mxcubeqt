@@ -24,6 +24,7 @@ from mxcubeqt.utils import colors, icons, qt_import
 from mxcubeqt.bricks.proposal_brick import ProposalBrick, ProposalGUIEvent
 from mxcubecore import HardwareRepository as HWR
 
+
 class P11ProposalBrick(ProposalBrick):
     def __init__(self, *args):
         super(P11ProposalBrick, self).__init__(*args)
@@ -89,7 +90,6 @@ class P11ProposalBrick(ProposalBrick):
         qt_import.QApplication.postEvent(self, start_server_event)
 
     def p11_login_as_proposal(self):
-
         if HWR.beamline.lims.simulated_proposal == 1:
             proposal_code = HWR.beamline.lims.simulated_prop_code
             proposal_number = HWR.beamline.lims.simulated_prop_number
@@ -103,11 +103,13 @@ class P11ProposalBrick(ProposalBrick):
         )
 
         self._do_login_as_proposal(
-            proposal_code, proposal_number, None, HWR.beamline.lims.beamline_name,
+            proposal_code,
+            proposal_number,
+            None,
+            HWR.beamline.lims.beamline_name,
         )
 
     def show_selected_proposal(self, proposal):
-
         beamtime_id = HWR.beamline.session.get_current_beamtime_id()
         prop_number = str(proposal["number"])
         prop_code = str(proposal["code"])
