@@ -90,24 +90,59 @@ class P11ProposalBrick(ProposalBrick):
         qt_import.QApplication.postEvent(self, start_server_event)
 
     def p11_login_as_proposal(self):
-        if HWR.beamline.lims.simulated_proposal == 1:
-            proposal_code = HWR.beamline.lims.simulated_prop_code
-            proposal_number = HWR.beamline.lims.simulated_prop_number
-        else:
-            proposal_code = HWR.beamline.session.get_current_proposal_code()
-            proposal_number = HWR.beamline.session.get_current_proposal_number()
+        try:
+            if HWR.beamline.lims.simulated_proposal == 1:
+                proposal_code = HWR.beamline.lims.simulated_prop_code
+                proposal_number = HWR.beamline.lims.simulated_prop_number
+            else:
+                proposal_code = HWR.beamline.session.get_current_proposal_code()
+                proposal_number = HWR.beamline.session.get_current_proposal_number()
 
-        logging.getLogger("HWR").debug(" PROPOSAL BRICK - code is %s" % proposal_code)
-        logging.getLogger("HWR").debug(
-            " PROPOSAL BRICK - number is %s" % proposal_number
-        )
+            logging.getLogger("HWR").debug(
+                " PROPOSAL BRICK - code is %s" % proposal_code
+            )
+            logging.getLogger("HWR").debug(
+                " PROPOSAL BRICK - number is %s" % proposal_number
+            )
 
-        self._do_login_as_proposal(
-            proposal_code,
-            proposal_number,
-            None,
-            HWR.beamline.lims.beamline_name,
-        )
+            # Fetch proposal data
+            prop = HWR.beamline.lims.get_proposal(proposal_code, proposal_number)
+
+            # Check for ISPyB connection error
+            if prop["status"]["code"] == "error":
+                self.message_widget.setText("ISPyB is not connected.")
+                self.message_widget.show()
+
+            # Display the available proposal info
+            self.show_selected_proposal(prop["Proposal"])
+
+        except Exception as e:
+            # Catch any errors and display them as warnings but proceed
+            logging.getLogger("HWR").error(f"Error logging in as proposal: {str(e)}")
+            self.message_widget.setText(f"Error: {str(e)}")
+            self.message_widget.show()
+            self.show_selected_proposal(
+                {"code": proposal_code, "number": proposal_number}
+            )
+
+    def show_selected_proposal(self, proposal):
+        """
+        Display the selected proposal information even if incomplete.
+        """
+        try:
+            beamtime_id = HWR.beamline.session.get_current_beamtime_id()
+            prop_code = str(proposal.get("code", "Unknown"))
+            prop_number = str(proposal.get("number", "Unknown"))
+
+            prop_info = f"ID: {prop_code}-{prop_number} - BT_ID: {beamtime_id}"
+
+            self.proposal_info.setText(prop_info)
+            self.proposal_info.show()
+
+        except KeyError as e:
+            logging.getLogger("HWR").error(f"Missing proposal information: {str(e)}")
+            self.proposal_info.setText(f"ID: {prop_code}-Unknown - BT_ID: Unknown")
+            self.proposal_info.show()
 
     def show_selected_proposal(self, proposal):
         beamtime_id = HWR.beamline.session.get_current_beamtime_id()
