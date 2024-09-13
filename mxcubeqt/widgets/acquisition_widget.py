@@ -662,7 +662,13 @@ class AcquisitionWidget(qt_import.QWidget):
             self._acquisition_mib.validate_all()
 
     def update_transmission_limits(self, limits):
-        if limits:
+        """
+        Updates the transmission limits in the validator.
+
+        Args:
+            limits (tuple): A tuple containing the minimum and maximum transmission limits.
+        """
+        if limits and limits[0] is not None and limits[1] is not None:
             self.transmission_validator.setBottom(limits[0])
             self.transmission_validator.setTop(limits[1])
             self.acq_widget_layout.transmission_ledit.setToolTip(
@@ -670,6 +676,8 @@ class AcquisitionWidget(qt_import.QWidget):
                 + "2 digits precision."
             )
             self._acquisition_mib.validate_all()
+        else:
+           self.acq_widget_layout.transmission_ledit.setToolTip("Invalid transmission limits received: {}".format(limits))
 
     def update_resolution_limits(self, limits):
         if limits:
