@@ -132,15 +132,11 @@ class DigitalZoomBrick(BaseWidget):
 
         if self.motor_hwobj.is_ready:
             colors.set_widget_color(
-                self.positions_combo,
-                colors.LIGHT_GREEN,
-                qt_import.QPalette.Button,
+                self.positions_combo, colors.LIGHT_GREEN, qt_import.QPalette.Button
             )
         else:
             colors.set_widget_color(
-                self.positions_combo,
-                colors.LIGHT_GRAY,
-                qt_import.QPalette.Button,
+                self.positions_combo, colors.LIGHT_GRAY, qt_import.QPalette.Button
             )
 
         # self.setToolTip(state=state)
