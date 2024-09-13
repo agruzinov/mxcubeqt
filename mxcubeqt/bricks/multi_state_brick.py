@@ -63,9 +63,7 @@ __category__ = "General"
 
 
 class MultiStateBrick(BaseWidget):
-    units = {
-        "micron": u"\u03BC",
-    }
+    units = {"micron": u"\u03BC"}
 
     def __init__(self, *args):
 
@@ -132,17 +130,13 @@ class MultiStateBrick(BaseWidget):
         elif property_name == "mnemonic":
             if self.multi_hwobj is not None:
                 self.disconnect(self.multi_hwobj, "stateChanged", self.state_changed)
-                self.disconnect(
-                    self.multi_hwobj, "valueChanged", self.value_changed,
-                )
+                self.disconnect(self.multi_hwobj, "valueChanged", self.value_changed)
 
             self.multi_hwobj = self.get_hardware_object(new_value)
 
             if self.multi_hwobj is not None:
                 self.connect(self.multi_hwobj, "stateChanged", self.state_changed)
-                self.connect(
-                    self.multi_hwobj, "valueChanged", self.value_changed,
-                )
+                self.connect(self.multi_hwobj, "valueChanged", self.value_changed)
 
                 self.fill_positions()
                 if self.multibutton:
@@ -161,7 +155,8 @@ class MultiStateBrick(BaseWidget):
 
     def get_position_label(self, posidx):
         pos = self.positions[posidx]
-        unit = self.multi_hwobj.get_property_value_by_index(posidx, "unit")
+        # Access the unit directly from self.multi_hwobj._positions
+        unit = self.multi_hwobj._positions.get(pos, {}).get("unit", "")
         label = str(pos)
         if unit:
             label += self.units.get(unit, unit)
@@ -225,17 +220,21 @@ class MultiStateBrick(BaseWidget):
         self.multi_position_combo.blockSignals(True)
 
         if value is None:
-            value = self.multi_hwobj.get_value()
+            value = (
+                self.multi_hwobj.get_value()
+            )  # Ensure this returns an index or similar
 
-        if value >= 0 and value < len(self.positions):
+        # Ensure value is an integer index, not a dict or object
+        if isinstance(value, int) and 0 <= value < len(self.positions):
             self.multi_position_combo.setCurrentIndex(value)
         else:
             self.multi_position_combo.setCurrentIndex(-1)
 
         self.multi_position_combo.blockSignals(False)
 
-        # value is index
+        # Disable the current button
         for button in self.multibuttons:
             button.setEnabled(True)
 
-        self.multibuttons[value].setEnabled(False)
+        if isinstance(value, int) and value < len(self.multibuttons):
+            self.multibuttons[value].setEnabled(False)
