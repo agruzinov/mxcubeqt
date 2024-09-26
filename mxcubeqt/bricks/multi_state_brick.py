@@ -56,7 +56,6 @@ from mxcubeqt.base_components import BaseWidget
 
 from mxcubecore.BaseHardwareObjects import HardwareObjectState
 
-
 __credits__ = ["MXCuBE collaboration"]
 __license__ = "LGPLv3+"
 __category__ = "General"
@@ -201,7 +200,7 @@ class MultiStateBrick(BaseWidget):
                 position_name = self.positions[index]
                 self.multi_hwobj.set_value(position_name)
             else:
-                self.log.error(f"Invalid index: {index}.")
+                logging.error(f"Invalid index: {index}.")
         elif isinstance(self.positions, dict):
             # If positions is a dictionary, convert keys to a list and use the index
             keys_list = list(self.positions.keys())
@@ -209,9 +208,9 @@ class MultiStateBrick(BaseWidget):
                 position_name = keys_list[index]
                 self.multi_hwobj.set_value(position_name)
             else:
-                self.log.error(f"Invalid index: {index}.")
+                logging.error(f"Invalid index: {index}.")
         else:
-            self.log.error(f"Invalid type for positions: {type(self.positions)}")
+            logging.error(f"Invalid type for positions: {type(self.positions)}")
 
     def state_changed(self, state=None):
         """Update the UI based on the current state of the hardware."""
@@ -252,7 +251,7 @@ class MultiStateBrick(BaseWidget):
         elif isinstance(self.positions, list):
             positions_list = self.positions
         else:
-            self.log.error(f"Invalid type for positions: {type(self.positions)}")
+            logging.error(f"Invalid type for positions: {type(self.positions)}")
             positions_list = []
 
         # Handle string positions and index values
@@ -262,7 +261,7 @@ class MultiStateBrick(BaseWidget):
                 self.multi_position_combo.setCurrentIndex(positions_list.index(value))
                 self.label.setText(f"Current Position: {value}")
             else:
-                self.log.error(f"Unknown position: {value}")
+                logging.error(f"Unknown position: {value}")
                 self.label.setText("Unknown Position")
                 self.multi_position_combo.setCurrentIndex(-1)
         else:
@@ -270,7 +269,7 @@ class MultiStateBrick(BaseWidget):
                 # If value is an index, convert it to an integer
                 value = int(value)
             except (ValueError, TypeError):
-                self.log.error(
+                logging.error(
                     f"Invalid value type: {value}. Expected an integer or string."
                 )
                 value = -1
