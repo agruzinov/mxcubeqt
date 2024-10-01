@@ -127,3 +127,24 @@ class P11MachineInfoBrick(BaseWidget):
         self.lifetime_label.setText(f"{lifetime_value} hours")
         self.energy_label.setText(f"{energy_value} GeV")
         self.message_label.setText(f"{message_value}")
+
+        # Check if machine current is <= 99, change color
+        if current_value != "N/A" and float(current_value) <= 99:
+            self.set_all_labels_color("salmon")
+        else:
+            self.reset_all_labels_color()
+
+    def set_all_labels_color(self, color):
+        """Set all label backgrounds to the specified color."""
+        self.current_label.setStyleSheet(f"background-color: {color};")
+        self.message_label.setStyleSheet(f"background-color: {color};")
+        self.lifetime_label.setStyleSheet(f"background-color: {color};")
+        self.energy_label.setStyleSheet(f"background-color: {color};")
+
+    def reset_all_labels_color(self):
+        """Reset all label backgrounds to their default color."""
+        default_color = "#6cb2f8"
+        self.current_label.setStyleSheet(f"background-color: {default_color};")
+        self.message_label.setStyleSheet(f"background-color: {default_color};")
+        self.lifetime_label.setStyleSheet(f"background-color: {default_color};")
+        self.energy_label.setStyleSheet(f"background-color: {default_color};")
