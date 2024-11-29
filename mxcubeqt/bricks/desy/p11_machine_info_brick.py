@@ -115,7 +115,6 @@ class P11MachineInfoBrick(BaseWidget):
 
     def set_value(self, values_dict):
         """Update the labels in the MachineInfoBrick with machine values."""
-        logging.info(f"Received machine info values: {values_dict}")
 
         current_value = values_dict.get("current", {}).get("value", "N/A")
         lifetime_value = values_dict.get("lifetime", {}).get("value", "N/A")
