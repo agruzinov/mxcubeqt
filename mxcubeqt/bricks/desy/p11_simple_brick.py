@@ -31,6 +31,8 @@ operations on the Cats sample changer.
 
 import logging
 
+import gevent
+
 from mxcubeqt.base_components import BaseWidget
 from mxcubeqt.utils import colors, qt_import
 from mxcubeqt.utils import sample_changer_helper as sc_helper
@@ -279,7 +281,7 @@ class P11SimpleBrick(SampleChangerBrick):
 
     def deice_robot(self):
         logging.getLogger("GUI").info("Deice robot")
-        HWR.beamline.sample_changer.deice()
+        gevent.spawn(HWR.beamline.sample_changer.deice)
 
     def abort_mounting(self):
         HWR.beamline.sample_changer._do_abort()

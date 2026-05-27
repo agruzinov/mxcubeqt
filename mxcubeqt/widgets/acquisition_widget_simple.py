@@ -116,7 +116,7 @@ class AcquisitionWidgetSimple(qt_import.QWidget):
         self.acq_widget_layout.detector_roi_mode_label.setEnabled(False)
         self.acq_widget_layout.detector_roi_mode_combo.setEnabled(False)
 
-        self.set_tunable_energy(HWR.beamline.config.tunable_wavelength)
+        self.set_tunable_energy(HWR.beamline.tunable_wavelength)
 
         if HWR.beamline.diffractometer.in_plate_mode():
             self.acq_widget_layout.num_images_cbox.clear()
@@ -125,7 +125,69 @@ class AcquisitionWidgetSimple(qt_import.QWidget):
 
         self.init_detector_roi_modes()
         self.init_limits()
-
+############################################### FIX for the Kappa-Phi Labels for P11 ##################
+        self.hide_kappa_phi_labels()
+    
+    def hide_kappa_phi_labels(self):
+        """Hide ONLY kappa and phi labels and their value fields, not entire rows"""
+        print("Starting targeted kappa/phi hiding process...")
+        
+        # Method 1: Hide specific kappa and phi widgets by name
+        self.hide_kappa_phi_by_name()
+        
+        # Method 2: Hide by finding labels and their associated value fields
+        self.hide_kappa_phi_by_text()
+        
+        print("Targeted kappa/phi hiding process completed")
+    
+    def hide_kappa_phi_by_name(self):
+        """Hide kappa and phi elements by their specific widget names"""
+        
+        # Look for specific kappa and phi widgets by name
+        kappa_phi_widgets = [
+            'kappa_label', 'kappa_ledit', 'kappa_phi_label', 'kappa_phi_ledit'
+        ]
+        
+        for widget_name in kappa_phi_widgets:
+            widget = self.acq_widget_layout.findChild(qt_import.QWidget, widget_name)
+            if widget:
+                widget.setVisible(False)
+                print(f"Hidden widget by name: {widget_name}")
+    
+    def hide_kappa_phi_by_text(self):
+        """Hide kappa and phi labels and find their associated value fields"""
+        
+        # Find all labels with "Kappa:" or "Phi:" text
+        for child in self.findChildren(qt_import.QLabel):
+            if child.text() in ["Kappa:", "Phi:"]:
+                print(f"Found label: '{child.text()}'")
+                
+                # Hide the label itself
+                child.setVisible(False)
+                
+                # Find and hide the associated value field (next widget in the same container)
+                self.hide_associated_value_field(child)
+    
+    def hide_associated_value_field(self, label_widget):
+        """Hide the value field associated with a kappa/phi label"""
+        
+        # Get the parent of the label
+        parent = label_widget.parent()
+        if not parent:
+            return
+        
+        # Look for the next widget in the same parent that could be a value field
+        for i, child in enumerate(parent.children()):
+            if child == label_widget:
+                # Found the label, now look for the next widget
+                if i + 1 < len(parent.children()):
+                    next_widget = parent.children()[i + 1]
+                    if isinstance(next_widget, (qt_import.QLineEdit, qt_import.QSpinBox, 
+                                              qt_import.QDoubleSpinBox, qt_import.QLabel)):
+                        next_widget.setVisible(False)
+                        print(f"Hidden associated value field: {next_widget.__class__.__name__}")
+                break
+#########################################################################################################                
     def update_osc_total_range(self):
         pass
 
@@ -197,7 +259,7 @@ class AcquisitionWidgetSimple(qt_import.QWidget):
         pass
 
     def init_limits(self):
-        limits_dict = HWR.beamline.config.acquisition_limit_values
+        limits_dict = HWR.beamline.acquisition_limit_values
 
         tpl = limits_dict.get("osc_range")
         if tpl:

@@ -31,7 +31,7 @@ from logging.handlers import TimedRotatingFileHandler
 import tempfile
 import platform
 from optparse import OptionParser
-from pkg_resources import resource_filename, resource_string
+from importlib.resources import files
 
 import gevent
 import gevent.monkey
@@ -85,11 +85,23 @@ LOGGING_NAME = ""
 #sys.path.insert(0, MXCUBEQT_ROOT)
 
 #MOCKUP_CONFIG_PATH = os.path.join(MXCUBEQT_ROOT, "example_config.yml")
-MOCKUP_CONFIG_PATH = resource_filename('mxcubeqt', 'configuration/mockup.yml')
+# Use importlib.resources instead of deprecated pkg_resources
+try:
+    MOCKUP_CONFIG_PATH = str(files('mxcubeqt') / 'configuration/mockup.yml')
+except (ModuleNotFoundError, TypeError):
+    # Fallback for development mode when package is not installed
+    from pathlib import Path
+    MOCKUP_CONFIG_PATH = str(Path(__file__).resolve().parent / 'configuration/mockup.yml')
 
 path = []
 for p in ['configuration/mockup', 'configuration/mockup/qt']:
-    path.append(resource_filename('mxcubecore', p))
+    try:
+        path.append(str(files('mxcubecore') / p))
+    except (ModuleNotFoundError, TypeError):
+        # Fallback for development mode when package is not installed
+        from pathlib import Path
+        mxcubecore_path = Path(__file__).resolve().parents[1] / 'mxcubecore'
+        path.append(str(mxcubecore_path / p))
 
 MOCKUP_CORE_CONFIG_PATH = ":".join(path)
 

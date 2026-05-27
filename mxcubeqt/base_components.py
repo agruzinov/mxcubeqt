@@ -906,11 +906,27 @@ class BaseWidget(connectable.Connectable, qt_import.QFrame):
     def del_property(self, property_name):
         return self.property_bag.del_property(property_name)
 
+    @staticmethod
+    def _hw_config_ext(hardware_object_name):
+        """Return the config file extension (yaml/yml/xml) that exists in the
+        repository for *hardware_object_name*, or 'yaml' as a fallback."""
+        rel = hardware_object_name.lstrip("/")
+        repo = HWR.get_hardware_repository()
+        paths = getattr(repo, "server_address", []) if repo else []
+        for directory in paths:
+            for ext in ("yaml", "yml", "xml"):
+                if os.path.exists(os.path.join(directory, rel + "." + ext)):
+                    return ext
+        return "yaml"
+
     def get_hardware_object(self, hardware_object_name, optional=False):
         splash_screen = mxcubeqt.get_splash()
         if splash_screen:
+            # Remove leading "/" if present for display, otherwise use name as-is
+            hw_name = hardware_object_name[1:] if hardware_object_name.startswith("/") else hardware_object_name
+            ext = BaseWidget._hw_config_ext(hardware_object_name)
             splash_screen.set_message(
-                "Loading hardware object defined in %s.xml" % hardware_object_name
+                "Loading hardware object defined in %s.%s" % (hw_name, ext)
             )
 
         if not hardware_object_name in self.__loaded_hardware_objects:
@@ -930,9 +946,12 @@ class BaseWidget(connectable.Connectable, qt_import.QFrame):
             self.connect(hwobj, "showWarning", self.show_warning)
 
         if hwobj is None and not optional:
+            # Remove leading "/" if present for display, otherwise use name as-is
+            hw_name = hardware_object_name[1:] if hardware_object_name.startswith("/") else hardware_object_name
+            ext = BaseWidget._hw_config_ext(hardware_object_name)
             logging.getLogger("GUI").error(
-                "%s: Unable to initialize hardware object defined in %s.xml"
-                % (self.objectName(), hardware_object_name[1:])
+                "%s: Unable to initialize hardware object defined in %s.%s"
+                % (self.objectName(), hw_name, ext)
             )
             self.set_background_color(colors.LIGHT_RED)
             self.__failed_to_load_hwobj = True

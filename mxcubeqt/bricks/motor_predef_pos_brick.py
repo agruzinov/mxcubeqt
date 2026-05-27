@@ -134,6 +134,11 @@ class MotorPredefPosBrick(BaseWidget):
                     "valueChanged",
                     self.predefined_position_changed,
                 )
+                self.disconnect(
+                    self.motor_hwobj,
+                    "predefinedPositionChanged",
+                    self.predefined_position_changed,
+                )
 
             self.motor_hwobj = self.get_hardware_object(new_value)
 
@@ -143,6 +148,12 @@ class MotorPredefPosBrick(BaseWidget):
                 self.connect(
                     self.motor_hwobj,
                     "valueChanged",
+                    self.predefined_position_changed,
+                )
+                # Also connect to predefinedPositionChanged for actuators that emit it
+                self.connect(
+                    self.motor_hwobj,
+                    "predefinedPositionChanged",
                     self.predefined_position_changed,
                 )
 
@@ -191,10 +202,34 @@ class MotorPredefPosBrick(BaseWidget):
         self.next_position_button.setEnabled(index < (len(self.positions) - 1))
         self.previous_position_button.setEnabled(index >= 0)
 
-    def predefined_position_changed(self, position_enum):
+    def predefined_position_changed(self, position_enum, value=None):
+        """Handle position changed signal.
+        
+        Can be called with:
+        - (ZoomEnum,) from valueChanged signal when value is an enum
+        - (ZoomEnum, float_value) from predefinedPositionChanged signal
+        - (float_value,) from valueChanged signal when value is numeric
+        """
+        # Handle tuple from predefinedPositionChanged signal (enum, value)
+        if value is not None and hasattr(position_enum, 'value'):
+            # Called from predefinedPositionChanged with (enum, numeric_value)
+            pass  # position_enum is already the enum we need
+        elif isinstance(position_enum, tuple):
+            # Called from valueChanged with ((value,),) - unpack
+            position_enum = position_enum[0] if position_enum else None
+        
+        if position_enum is None:
+            return
+            
         if self.positions:
             for index, item in enumerate(self.positions):
-                if position_enum.value == item.value:
+                # Handle both enum comparison and value comparison
+                if hasattr(position_enum, 'value'):
+                    if position_enum.value == item.value:
+                        self.positions_combo.setCurrentIndex(index)
+                        return
+                elif hasattr(item, 'value') and position_enum == item.value:
+                    # position_enum is a raw value, compare with item.value
                     self.positions_combo.setCurrentIndex(index)
                     return
 

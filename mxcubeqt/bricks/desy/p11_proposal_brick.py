@@ -72,11 +72,12 @@ class P11ProposalBrick(ProposalBrick):
         self.login_button.hide()
         self.user_group_widget.show()
 
-        # Set fallback session
-        HWR.beamline.session.proposal_code = ""
-        HWR.beamline.session.session_id = 1
-        HWR.beamline.session.proposal_id = ""
-        HWR.beamline.session.proposal_number = ""
+        # Set fallback session only if session is available
+        if HWR.beamline.session:
+            HWR.beamline.session.proposal_code = ""
+            HWR.beamline.session.session_id = 1
+            HWR.beamline.session.proposal_id = ""
+            HWR.beamline.session.proposal_number = ""
 
         self.setWindowTitle.emit(self["titlePrefix"])
         self.loggedIn.emit(True)
@@ -115,6 +116,11 @@ class P11ProposalBrick(ProposalBrick):
             proposal_code = HWR.beamline.lims.simulated_prop_code
             proposal_number = HWR.beamline.lims.simulated_prop_number
         else:
+            # Handle case where session is not available
+            if not HWR.beamline.session:
+                logging.getLogger("HWR").warning("Session not available, cannot login as proposal")
+                self.loggedIn.emit(False)
+                return
             proposal_code = HWR.beamline.session.get_current_proposal_code()
             proposal_number = HWR.beamline.session.get_current_proposal_number()
 
@@ -124,12 +130,22 @@ class P11ProposalBrick(ProposalBrick):
 
         prop = HWR.beamline.lims.get_proposal(proposal_code, proposal_number)
 
-        if not prop or prop.get("status", {}).get("code") != "ok":
+        # Allow login even if ISPyB is unavailable - use fallback proposal data
+        if not prop:
             logging.getLogger("HWR").error(
-                "P11ProposalBrick: Login as proposal failed."
+                "P11ProposalBrick: Login as proposal failed - no proposal data."
             )
-            self.loggedIn.emit(False)  # Ensure UI reflects the failure
+            self.loggedIn.emit(False)
             return
+        
+        # Check status - if error, log warning but continue with fallback data
+        status = prop.get("status", {})
+        if status.get("code") != "ok":
+            logging.getLogger("HWR").warning(
+                f"P11ProposalBrick: ISPyB connection issue ({status.get('msg', 'unknown')}), "
+                f"continuing with offline mode for proposal {proposal_code}{proposal_number}"
+            )
+            # Continue with the fallback proposal data
 
         self._do_login_as_proposal(
             proposal_code, proposal_number, None, HWR.beamline.lims.beamline_name
@@ -164,18 +180,101 @@ class P11ProposalBrick(ProposalBrick):
         """
         Displays selected proposal information in the UI.
         Handles 'suds.sudsobject' by accessing its attributes directly.
+        Falls back to session data when proposal object is missing or incomplete.
         """
+        # Log entry point with proposal info
+        logging.getLogger("HWR").info(
+            f"show_selected_proposal called with proposal type: {type(proposal)}, value: {proposal}"
+        )
+        
         try:
-            # Extracting attributes directly from the suds object
-            beamtime_id = HWR.beamline.session.get_current_beamtime_id()
-            prop_number = getattr(proposal, "proposalNumber", "N/A")
-            prop_code = getattr(proposal, "proposalCode", "N/A")
+            # Get beamtime ID from session
+            if HWR.beamline.session:
+                beamtime_id = HWR.beamline.session.get_current_beamtime_id()
+            else:
+                beamtime_id = "N/A"
+            
+            # Try to get proposal code and number from proposal object
+            prop_number = None
+            prop_code = None
+            
+            if proposal is not None:
+                # First try dictionary-style access (most common case)
+                if isinstance(proposal, dict):
+                    prop_number = proposal.get("number", None)
+                    prop_code = proposal.get("code", None)
+                    # Also try alternative key names
+                    if prop_number is None:
+                        prop_number = proposal.get("proposalNumber", None)
+                    if prop_code is None:
+                        prop_code = proposal.get("proposalCode", None)
+                    logging.getLogger("HWR").info(
+                        f"Extracted from dict: code={prop_code}, number={prop_number}"
+                    )
+                else:
+                    # Try attribute access for suds objects or other objects
+                    try:
+                        prop_number = getattr(proposal, "proposalNumber", None)
+                        prop_code = getattr(proposal, "proposalCode", None)
+                        # Also try alternative attribute names
+                        if prop_number is None:
+                            prop_number = getattr(proposal, "number", None)
+                        if prop_code is None:
+                            prop_code = getattr(proposal, "code", None)
+                        logging.getLogger("HWR").info(
+                            f"Extracted from attributes: code={prop_code}, number={prop_number}"
+                        )
+                    except (AttributeError, TypeError) as e:
+                        logging.getLogger("HWR").warning(f"Attribute access failed: {e}")
+                        pass
+            else:
+                logging.getLogger("HWR").warning("Proposal object is None")
+            
+            # Fall back to session data if proposal object doesn't have the info
+            if prop_number is None or prop_code is None:
+                logging.getLogger("HWR").info(
+                    f"Proposal extraction incomplete: code={prop_code}, number={prop_number}, using session fallback"
+                )
+                if HWR.beamline.session:
+                    if prop_code is None:
+                        prop_code = HWR.beamline.session.get_current_proposal_code()
+                        logging.getLogger("HWR").info(f"Got proposal code from session: {prop_code}")
+                    if prop_number is None:
+                        prop_number = HWR.beamline.session.get_current_proposal_number()
+                        logging.getLogger("HWR").info(f"Got proposal number from session: {prop_number}")
+                else:
+                    logging.getLogger("HWR").warning("No session available for fallback")
+                    prop_code = prop_code or "N/A"
+                    prop_number = prop_number or "N/A"
+            
+            # Convert to string if needed, ensuring we have valid values
+            # Note: session methods may return "N/A" as string, which is acceptable
+            prop_code = str(prop_code) if prop_code is not None and prop_code != "" else "N/A"
+            prop_number = str(prop_number) if prop_number is not None and prop_number != "" else "N/A"
+            
+            logging.getLogger("HWR").info(
+                f"Final proposal values: code={prop_code}, number={prop_number}, beamtime_id={beamtime_id}"
+            )
 
             # Format the information for display
             prop_info = f"ID: {prop_code}-{prop_number} - BT_ID: {beamtime_id}"
-        except AttributeError as e:
-            logging.getLogger("HWR").error(f"Error displaying proposal: {e}")
-            prop_info = "Incomplete proposal information."
+        except Exception as e:
+            logging.getLogger("HWR").error(f"Error displaying proposal: {e}", exc_info=True)
+            # Fallback: try to get from session
+            try:
+                if HWR.beamline.session:
+                    prop_code = HWR.beamline.session.get_current_proposal_code()
+                    prop_number = HWR.beamline.session.get_current_proposal_number()
+                    beamtime_id = HWR.beamline.session.get_current_beamtime_id()
+                    # Ensure we have valid values
+                    prop_code = str(prop_code) if prop_code is not None and prop_code != "" else "N/A"
+                    prop_number = str(prop_number) if prop_number is not None and prop_number != "" else "N/A"
+                    prop_info = f"ID: {prop_code}-{prop_number} - BT_ID: {beamtime_id}"
+                else:
+                    prop_info = "Incomplete proposal information."
+            except Exception as e2:
+                logging.getLogger("HWR").error(f"Error in fallback: {e2}", exc_info=True)
+                prop_info = "Incomplete proposal information."
 
         logging.getLogger("GUI").info(f"Displaying proposal info: {prop_info}")
         self.proposal_info.setText(prop_info)

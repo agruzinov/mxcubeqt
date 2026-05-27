@@ -625,7 +625,15 @@ class TreeBrick(BaseWidget):
         """
         log = logging.getLogger("user_level_log")
 
-        lims_name = HWR.beamline.lims.get_lims_name()
+        # Get LIMS name for get_samples() - new AbstractLims API uses lims_name instead of proposal_id/session_id
+        lims_name = "ISPyB"  # Default for ISPyB
+        try:
+            lims_list = HWR.beamline.lims.get_lims_name()
+            if lims_list and len(lims_list) > 0:
+                lims_name = lims_list[0].name
+        except Exception:
+            pass
+        
         self.lims_samples = HWR.beamline.lims.get_samples(lims_name)
 
         basket_list = []

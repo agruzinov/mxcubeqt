@@ -126,9 +126,12 @@ class CreateHelicalWidget(CreateTaskBase):
         #     run_online_processing_cbox.setChecked(False)
 
 
-        self._processing_widget.processing_widget.run_online_processing_cbox.setChecked(
-            HWR.beamline.config.run_online_processing
-        )
+        if not HWR.beamline.online_processing_methods:
+            self._processing_widget.processing_widget.run_online_processing_cbox.setChecked(False)
+        else:
+            self._processing_widget.processing_widget.run_online_processing_cbox.setChecked(
+                HWR.beamline.run_online_processing
+            )
         self.enable_widgets(False)
 
         shapes = HWR.beamline.sample_view.get_shapes()

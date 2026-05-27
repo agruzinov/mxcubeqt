@@ -154,9 +154,9 @@ class ConfirmDialog(qt_import.QDialog):
                 acq_parameters = item_model.reference_image_collection.acquisitions[
                     0
                 ].acquisition_parameters
-                self.conf_dialog_layout.take_snapshots_combo.setCurrentIndex(
-                    self.conf_dialog_layout.take_snapshots_combo.count() - 1
-                )
+                # Do not override the snapshot combo here — preserve the user's
+                # last selection across characterisations (same behaviour as
+                # standard data collection).
             elif isinstance(item, queue_item.XrayCenteringQueueItem):
                 acq_parameters = item_model.mesh_dc.acquisitions[
                     0

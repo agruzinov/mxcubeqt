@@ -81,6 +81,10 @@ class DataCollectTree(qt_import.QWidget):
         self.last_added_item = None
         self.item_copy = None
 
+        # Beam-presence UI gating (see _ensure_machine_info_signal_connected).
+        self._beam_present_ui = True
+        self._machine_info_signal_connected = False
+
         self.selection_changed_cb = None
         self.collect_stop_cb = None
         #self.clear_centred_positions_cb = None
@@ -88,7 +92,7 @@ class DataCollectTree(qt_import.QWidget):
         self.item_menu = None
         self.item_history_list = []
         self.close_kappa = False
-        self.show_sc_during_mount = True
+        self.show_sc_during_mount = False
 
         # Signals ------------------------------------------------------------
 
@@ -308,6 +312,7 @@ class DataCollectTree(qt_import.QWidget):
                                 self.close_kappa_toggled)
                             close_kappa_action.setCheckable(True)
                             close_kappa_action.setChecked(self.close_kappa)
+                            close_kappa_action.setEnabled(False)
 
                             show_sc_view_action = self.item_menu.addAction(
                                 "During mount show sample changer")
@@ -497,6 +502,8 @@ class DataCollectTree(qt_import.QWidget):
                     )
                     if self.close_kappa:
                         HWR.beamline.diffractometer.close_kappa()
+                    items[0].setText(1, "")
+                    items[0].set_mounted_style(True)
                 except Exception as e:
                     import traceback
                     items[0].setText(1, "Error loading")
@@ -534,9 +541,6 @@ class DataCollectTree(qt_import.QWidget):
             items[0].setText(1, "Washing sample...")
 
             location = items[0].get_model().location
-
-            if self.show_sc_during_mount:
-                self.tree_brick.sample_mount_started.emit()
 
             self.tree_brick.enable_widgets.emit(False)
 
@@ -613,8 +617,6 @@ class DataCollectTree(qt_import.QWidget):
 
             location = items[0].get_model().location
 
-            if self.show_sc_during_mount:
-                self.tree_brick.sample_mount_started.emit()
             self.tree_brick.enable_widgets.emit(False)
 
             sample_changer = None
@@ -689,14 +691,112 @@ class DataCollectTree(qt_import.QWidget):
         self.toggle_collect_button_enabled()
 
     def toggle_collect_button_enabled(self):
-        enable_collect = (len(self.get_checked_items()) > 1 and
-                          len(self.get_checked_samples()) and
-                          self.enable_collect_condition) or \
-            self.collecting
+        self._ensure_machine_info_signal_connected()
+        self._refresh_beam_state()
+
+        # While collecting, the Collect button acts as "Stop" and must stay
+        # enabled. When idle, we additionally gate on beam presence so the
+        # user cannot start a queue without beam.
+        if self.collecting:
+            enable_collect = True
+        else:
+            enable_collect = (
+                len(self.get_checked_items()) > 1
+                and len(self.get_checked_samples())
+                and self.enable_collect_condition
+                and self._beam_present_ui
+            )
 
         self.collect_button.setEnabled(enable_collect)
+        if not self.collecting and not self._beam_present_ui:
+            self.collect_button.setToolTip(
+                "Disabled: ring current below threshold. Waiting for beam."
+            )
+        else:
+            self.collect_button.setToolTip("")
+
+        self._refresh_continue_button_enabled()
+
         self.enableCollectSignal.emit(
             self.enable_collect_condition and not self.collecting)
+
+    def _refresh_continue_button_enabled(self):
+        """Disable the Continue button (labelled 'Continue' when the queue
+        is paused) while the beam is below threshold, so the user cannot
+        override the auto-pause. The button stays enabled while it reads
+        'Pause' so voluntary pause is always possible.
+        """
+        if not self.collecting:
+            return
+        try:
+            text = self.continue_button.text()
+        except Exception:
+            return
+        if text == "Continue" and not self._beam_present_ui:
+            self.continue_button.setEnabled(False)
+            self.continue_button.setToolTip(
+                "Disabled: ring current below threshold. Waiting for beam."
+            )
+        else:
+            self.continue_button.setEnabled(True)
+            self.continue_button.setToolTip(
+                "Pause after current data collection"
+            )
+
+    def _ensure_machine_info_signal_connected(self):
+        if self._machine_info_signal_connected:
+            return
+        try:
+            machine_info = HWR.beamline.machine_info
+        except Exception:
+            return
+        if machine_info is None:
+            return
+        signal = getattr(machine_info, "valuesChanged", None)
+        if signal is None or not hasattr(signal, "connect"):
+            # Non-P11 machine_info: skip dynamic refresh; pre-start gate in
+            # the collection hook still protects against no-beam collects.
+            self._machine_info_signal_connected = True
+            return
+        try:
+            signal.connect(self._on_machine_values_changed)
+            self._machine_info_signal_connected = True
+        except Exception:
+            pass
+
+    def _on_machine_values_changed(self, _values_dict):
+        # Refresh buttons on the next event-loop iteration; we just need the
+        # latest beam state which is fetched via is_beam_present().
+        self.toggle_collect_button_enabled()
+
+    def _refresh_beam_state(self):
+        try:
+            machine_info = HWR.beamline.machine_info
+        except Exception:
+            machine_info = None
+        if machine_info is None or not hasattr(machine_info, "is_beam_present"):
+            self._beam_present_ui = True
+            return
+        # Bound the read so it cannot block the Qt signal handler
+        # (e.g. during queue abort when the calling greenlet is being torn
+        # down by gevent). On timeout/exception keep the previously known
+        # value so the UI stays consistent instead of flipping to True.
+        # NB: do NOT catch BaseException / GreenletExit here — if the
+        # current greenlet is being killed it must continue to unwind.
+        try:
+            with gevent.Timeout(0.5):
+                self._beam_present_ui = bool(machine_info.is_beam_present())
+        except gevent.Timeout:
+            logging.getLogger("HWR").debug(
+                "dc_tree_widget._refresh_beam_state: is_beam_present() timed out, "
+                "keeping previous state %s", self._beam_present_ui
+            )
+        except Exception:
+            logging.getLogger("HWR").debug(
+                "dc_tree_widget._refresh_beam_state: is_beam_present() failed, "
+                "keeping previous state %s", self._beam_present_ui,
+                exc_info=True,
+            )
 
     def get_item_by_model(self, parent_node):
         """Returns tree item by its model
@@ -930,6 +1030,10 @@ class DataCollectTree(qt_import.QWidget):
                 colors.BUTTON_ORIGINAL,
                 qt_import.QPalette.Button)
 
+        # Re-evaluate beam-gated enable state whenever pause flips.
+        self._refresh_beam_state()
+        self._refresh_continue_button_enabled()
+
     def collect_stop_toggle(self):
         """Stops queue"""
 
@@ -964,7 +1068,7 @@ class DataCollectTree(qt_import.QWidget):
                               " or more data collections"
 
                     qt_import.QMessageBox.information(self, "Data collection",
-                                                     message, "OK")
+                                                     message, qt_import.QMessageBox.Ok)
 
     def continue_shortcut_pressed(self):
         self.continue_button_click()
@@ -1090,12 +1194,17 @@ class DataCollectTree(qt_import.QWidget):
            Adds executed queue entry to the history view
         """
         view_item = queue_entry.get_view()
+    
+        # <-- NEW: Uncheck the item when execution finishes -->
+        if view_item is not None:
+            view_item.setCheckState(0, qt_import.Qt.Unchecked)
+        # <-- End of new code -->
+    
         if queue_entry.get_type_str() not in ["Sample", "Basket", ""]:
             item_model = queue_entry.get_data_model()
             item_details = ""
             sample_model = item_model.get_sample_node()
-            # sample_model = item_model.get_parent().get_parent()
-
+    
             if isinstance(view_item, queue_item.DataCollectionQueueItem):
                 item_details = "%.1f%s " % (item_model.as_dict()["osc_range"],
                                             u"\u00b0") + \
@@ -1107,7 +1216,7 @@ class DataCollectTree(qt_import.QWidget):
             elif isinstance(view_item, queue_item.EnergyScanQueueItem):
                 item_details = "Element: %s, " % item_model.element_symbol + \
                                "Edge: %s" % item_model.edge
-
+    
             self.add_history_entry(sample_model.get_display_name(),
                                    datetime.now().strftime("%Y.%m.%d"),
                                    datetime.now().strftime("%H:%M:%S"),
@@ -1115,7 +1224,7 @@ class DataCollectTree(qt_import.QWidget):
                                    status,
                                    item_details,
                                    view_item)
-
+    
     def add_history_entry(self, sample_name, date, time, entry_type,
                           status, entry_details, view_item=None):
         # At the top level insert date
@@ -1293,9 +1402,12 @@ class DataCollectTree(qt_import.QWidget):
             item = selected_items[0]
 
             if isinstance(item, queue_item.QueueItem):
-                if item.treeWidget().itemBelow(item) is not None:
-                    item.move_item(item.treeWidget().itemBelow(item))
-                    self.sample_tree_widget_selection()
+                parent = item.parent()
+                if parent is not None:
+                    index = parent.indexOfChild(item)
+                    if index < parent.childCount() - 1:
+                        item.move_item(parent.child(index + 1))
+                        self.sample_tree_widget_selection()
 
     def previous_sibling(self, item):
         """Returns previous item"""
@@ -1328,11 +1440,13 @@ class DataCollectTree(qt_import.QWidget):
             item = selected_items[0]
 
             if isinstance(item, queue_item.QueueItem):
-                #older_sibling = self.previous_sibling(item)
-                older_sibling = self.sample_tree_widget.itemAbove(item)
-                if older_sibling:
-                    older_sibling.move_item(item)
-                    self.sample_tree_widget_selection()
+                parent = item.parent()
+                if parent is not None:
+                    index = parent.indexOfChild(item)
+                    if index > 0:
+                        older_sibling = parent.child(index - 1)
+                        older_sibling.move_item(item)
+                        self.sample_tree_widget_selection()
 
     def samples_from_sc_content(self, sc_basket_content, sc_sample_content):
         """Initiates lists of baskets and samples"""

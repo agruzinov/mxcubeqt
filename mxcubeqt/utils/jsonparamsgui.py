@@ -102,8 +102,8 @@ class LayoutWidget(qt_import.QWidget):
                     widget.reset_options(ddict)
                 elif "value" in ddict:
                     widget.set_value(ddict["value"])
-                widget.highlight = ddict.get("highlight")
-                widget.invalidated = ddict.get("invalidated", False)
+                highlight: str = ddict.get("highlight")
+                widget.highlight = highlight
         finally:
             self.block_updates = False
             self.wait_event.set()
@@ -131,7 +131,7 @@ class LayoutWidget(qt_import.QWidget):
 
 
 class ValueWidget(qt_import.QWidget):
-    """Mixin class for widgets containing actual values (i..e not containers)"""
+    """Mixin class for widgets containg actual values (i..e not containers)"""
 
     def __init__(
         self,
@@ -145,8 +145,6 @@ class ValueWidget(qt_import.QWidget):
         if "default" in options:
             self.set_value(options["default"])
         self.update_on_change: bool = bool(options.get("update_on_change"))
-        # self.invalidated used to set fields (in)valid from update_on_change
-        self.invalidated = False
         self.highlight: Optional[str] = options.get("highlight")
         if self.is_hidden:
             self.hide()
@@ -165,7 +163,7 @@ class ValueWidget(qt_import.QWidget):
 
     def is_valid(self) -> bool:
         """Default value. Override in subclasses, when there is validity checking"""
-        return not self.invalidated
+        return True
 
     def input_field_changed(self) -> None:
         """UI update function triggered by field value changes
@@ -174,7 +172,8 @@ class ValueWidget(qt_import.QWidget):
         root_widget: LayoutWidget = self.gui_root_widget
         if root_widget.block_updates:
             return
-        if self.is_valid() or self.invalidated:
+        valid: bool = self.is_valid()
+        if valid:
             update_on_change: Optional[str] = self.gui_root_widget.update_on_change
             if update_on_change and (
                 self.update_on_change or update_on_change == "always"
@@ -187,8 +186,7 @@ class ValueWidget(qt_import.QWidget):
                 )
                 self.gui_root_widget.wait_event.wait()
         root_widget.validate_fields()
-        if self.is_valid():
-            # NB validity may have changed since first checked
+        if valid:
             self.colour_widget("CHANGED")
 
     def colour_widget(self, highlight: str) -> None:
@@ -278,7 +276,6 @@ class FloatString(LineEdit):
         if (
             self.validator.validate(self.text(), 0)[0]
             != qt_import.QValidator.Acceptable
-            or self.invalidated
         ):
             return False
         return True
@@ -714,12 +711,9 @@ class ColumnGridWidget(qt_import.QGridLayout):
                     widget_type: str = ui_field.get("ui:widget") or field.get(
                         "type", "string"
                     )
-                    if widget_type == "selection_table":
+                    if widget_type in ("textarea", "selection_table"):
                         self.setRowStretch(rownum, 8)
                         self.setColumnStretch(colnum, 8)
-                    elif widget_type == "textarea":
-                        self.setRowStretch(rownum, 1)
-                        self.setColumnStretch(colnum, 1)
                     title: Optional[str] = field.get("title") or ui_field.get(
                         "ui:title"
                     )

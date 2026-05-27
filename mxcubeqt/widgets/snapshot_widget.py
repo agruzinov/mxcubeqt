@@ -57,9 +57,9 @@ class SnapshotWidget(qt_import.QWidget):
     def display_snapshot(self, image, width=None):
         if image is not None:
             if width is not None:
-                ration = image.height() / float(image.width())
+                ratio = image.height() / float(image.width())
                 image = image.scaled(
-                    width, width * ration, qt_import.Qt.KeepAspectRatio, qt_import.Qt.SmoothTransformation
+                    int(width), int(width * ratio), qt_import.Qt.KeepAspectRatio, qt_import.Qt.SmoothTransformation
                 )
                 self.setFixedWidth(width)
 

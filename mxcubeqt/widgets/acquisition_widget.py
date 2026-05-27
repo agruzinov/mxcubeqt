@@ -56,6 +56,12 @@ class AcquisitionWidget(qt_import.QWidget):
         # Internal variables --------------------------------------------------
         self.previous_energy = 0
 
+         # Hide kappa and phi labels
+        if hasattr(self, 'kappa_label'):
+            self.kappa_label.setVisible(False)
+        if hasattr(self, 'phi_label'):
+            self.phi_label.setVisible(False)
+
         # If the acq. widget is used with grids then total osc range is not
         # equal to num_images * osc_range, but num_images_per_line * osc_range
         # For grids the osc total range is updated when a grid is selected
@@ -195,6 +201,44 @@ class AcquisitionWidget(qt_import.QWidget):
         self.acq_widget_layout.detector_roi_mode_combo.setEnabled(False)
 
         self.init_limits()
+############################################### FIX for the Kappa-Phi Labels for P11 ##################
+        self.hide_kappa_phi_labels()
+   
+    def hide_kappa_phi_labels(self):
+        """Ultra-precise hiding of ONLY kappa and phi elements"""
+        print("Starting ultra-precise kappa/phi hiding...")
+        
+        # Only hide the specific kappa and phi widgets we know about
+        self.hide_specific_kappa_phi_widgets()
+        
+        print("Ultra-precise kappa/phi hiding completed")
+    
+    def hide_specific_kappa_phi_widgets(self):
+        """Hide only the specific kappa and phi widgets"""
+        
+        # List of specific widget names to hide
+        widgets_to_hide = [
+            'kappa_label',      # Kappa: label
+            'kappa_ledit',      # Kappa value field
+            'kappa_phi_label',  # Phi: label  
+            'kappa_phi_ledit'   # Phi value field
+        ]
+        
+        # Hide each widget individually
+        for widget_name in widgets_to_hide:
+            widget = self.acq_widget_layout.findChild(qt_import.QWidget, widget_name)
+            if widget:
+                widget.setVisible(False)
+                print(f"Hidden specific widget: {widget_name}")
+            else:
+                print(f"Widget not found: {widget_name}")
+        
+        # Also hide any labels with "Kappa:" or "Phi:" text as backup
+        for child in self.findChildren(qt_import.QLabel):
+            if child.text() in ["Kappa:", "Phi:"]:
+                child.setVisible(False)
+                print(f"Hidden label by text: {child.text()}")
+#########################################################################################################              
 
     def use_max_osc_range(self, state):
         self.acq_widget_layout.max_osc_range_cbx.setEnabled(state)
@@ -368,7 +412,7 @@ class AcquisitionWidget(qt_import.QWidget):
         self.acq_widget_layout.kappa_phi_ledit.setEnabled(state)
 
     def init_limits(self):
-        limits_dict = HWR.beamline.config.acquisition_limit_values
+        limits_dict = HWR.beamline.acquisition_limit_values
 
         tpl = limits_dict.get("osc_range")
         if tpl:
@@ -495,13 +539,15 @@ class AcquisitionWidget(qt_import.QWidget):
             "shutterless", self.acq_widget_layout.shutterless_cbx, bool, None
         )
 
-        self.set_tunable_energy(HWR.beamline.config.tunable_wavelength)
+        self.set_tunable_energy(HWR.beamline.tunable_wavelength)
 
         has_shutter_less = HWR.beamline.detector.has_shutterless()
         self.acq_widget_layout.shutterless_cbx.setEnabled(False)
         self.acq_widget_layout.shutterless_cbx.setChecked(has_shutter_less)
 
-        if HWR.beamline.config.disable_num_passes:
+
+
+        if HWR.beamline.disable_num_passes:
             num_passes = self.acq_widget_layout.findChild(
                 qt_import.QLineEdit, "num_passes_ledit"
             )

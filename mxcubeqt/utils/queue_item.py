@@ -151,6 +151,7 @@ class QueueItem(qt_import.QTreeWidgetItem):
 
     def set_background_color(self, color_index):
         self.previous_bg_brush = self.background(0)
+        color_index = max(0, min(color_index, len(colors.QUEUE_ENTRY_COLORS) - 1))
         color = colors.QUEUE_ENTRY_COLORS[color_index]
         self.bg_brush = qt_import.QBrush(color)
         self.setBackground(0, self.bg_brush)

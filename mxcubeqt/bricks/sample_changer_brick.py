@@ -373,7 +373,8 @@ class BasketView(qt_import.QWidget):
         )
 
         self.samples_view.loadSampleSignal.connect(self.load_this_sample)
-        self.samples_view.selectSampleSignal.connect(self.user_select_this_sample)
+        self.samples_view.selectSampleSignal.connect(
+            self.user_select_this_sample)
         self.contents_widget.toggled.connect(self.toggle_basket_presence)
 
     def set_title(self, title):
@@ -431,7 +432,8 @@ class CurrentView(qt_import.QWidget):
         self.title = title
 
         self.contents_widget = qt_import.QGroupBox(title, self)
-        self.contents_widget_hlayout = qt_import.QHBoxLayout(self.contents_widget)
+        self.contents_widget_hlayout = qt_import.QHBoxLayout(
+            self.contents_widget)
         self.contents_widget_hlayout.setContentsMargins(0, 0, 0, 0)
         self.contents_widget_hlayout.setSpacing(0)
         self.contents_widget.setAlignment(qt_import.Qt.AlignLeft)
@@ -489,7 +491,8 @@ class CurrentBasketView(CurrentView):
     def __init__(self, parent):
         CurrentView.__init__(self, "Current basket", parent)
 
-        self.position_label = qt_import.QLabel("Position:", self.contents_widget)
+        self.position_label = qt_import.QLabel(
+            "Position:", self.contents_widget)
         self.selected_spinbox = qt_import.QSpinBox(self.contents_widget)
         # self.selected_spinbox.setWrapping(True)
         # self.selected_spinbox.editor().setAlignment(QWidget.AlignRight)
@@ -519,6 +522,7 @@ class CurrentBasketView(CurrentView):
 class CurrentSampleView(CurrentView):
 
     sampleChangerStateSignal = qt_import.pyqtSignal(str)
+    gripperIntervalChangedSignal = qt_import.pyqtSignal(int)
 
     def __init__(self, parent):
         CurrentView.__init__(self, "Current sample", parent)
@@ -529,11 +533,13 @@ class CurrentSampleView(CurrentView):
         self.unload_icon = None
 
         _current_sample_view_widget = qt_import.QWidget(self.contents_widget)
-        self.state_label = qt_import.QLabel("unknown", _current_sample_view_widget)
+        self.state_label = qt_import.QLabel(
+            "unknown", _current_sample_view_widget)
         self.state_label.setAlignment(qt_import.Qt.AlignHCenter)
 
         self.commands_widget = qt_import.QWidget(_current_sample_view_widget)
-        self.position_label = qt_import.QLabel("Position:", self.commands_widget)
+        self.position_label = qt_import.QLabel(
+            "Position:", self.commands_widget)
         self.selected_spinbox = qt_import.QSpinBox(self.commands_widget)
         self.selected_spinbox.setRange(1, 10)
         self.selected_spinbox.setSingleStep(1)
@@ -547,22 +553,47 @@ class CurrentSampleView(CurrentView):
         self.holder_length_spinbox.setRange(19, 26)
         self.holder_length_spinbox.setSingleStep(1)
         self.holder_length_spinbox.lineEdit().setAlignment(qt_import.Qt.AlignRight)
-        self.holder_length_spinboxUnit = qt_import.QLabel("mm", self.commands_widget)
+        self.holder_length_spinboxUnit = qt_import.QLabel(
+            "mm", self.commands_widget)
         self.holder_length_spinbox.setEnabled(False)
         self.holder_length_spinboxUnit.setEnabled(False)
         self.holder_length_label.setEnabled(False)
+
+        # Gripper Deice Sample Interval field
+        self.gripper_interval_label = qt_import.QLabel(
+            "Gripper Deice Sample Interval:", self.commands_widget
+        )
+        self.gripper_interval_spinbox = qt_import.QSpinBox(
+            self.commands_widget)
+        self.gripper_interval_spinbox.setRange(0, 999)  # Integer range 0-999
+        self.gripper_interval_spinbox.setSingleStep(1)
+        self.gripper_interval_spinbox.lineEdit().setAlignment(qt_import.Qt.AlignRight)
+        # Initially disabled like holder length
+        self.gripper_interval_spinbox.setEnabled(False)
+
+        # Add "samples" label after the spinbox
+        self.gripper_interval_unit = qt_import.QLabel(
+            "samples", self.commands_widget)
 
         self.load_button = qt_import.QToolButton(self.commands_widget)
         self.load_button.setText("Mount sample")
         # self.load_button.setTextPosition(QToolButton.BesideIcon)
         self.load_button.hide()
 
-        _commands_widget_gridlayout = qt_import.QGridLayout(self.commands_widget)
+        _commands_widget_gridlayout = qt_import.QGridLayout(
+            self.commands_widget)
         _commands_widget_gridlayout.addWidget(self.position_label, 0, 0)
         _commands_widget_gridlayout.addWidget(self.selected_spinbox, 0, 1)
         _commands_widget_gridlayout.addWidget(self.holder_length_label, 1, 0)
         _commands_widget_gridlayout.addWidget(self.holder_length_spinbox, 1, 1)
-        _commands_widget_gridlayout.addWidget(self.holder_length_spinboxUnit, 1, 2)
+        _commands_widget_gridlayout.addWidget(
+            self.holder_length_spinboxUnit, 1, 2)
+        _commands_widget_gridlayout.addWidget(
+            self.gripper_interval_label, 2, 0)
+        _commands_widget_gridlayout.addWidget(
+            self.gripper_interval_spinbox, 2, 1)
+        _commands_widget_gridlayout.addWidget(
+            self.gripper_interval_unit, 2, 2)
         # _commands_widget_gridlayout.addWidget(self.load_button, 2, 0, 2, 2)
         # self.commands_widget.setLayout(_commands_widget_gridlayout)
 
@@ -580,9 +611,16 @@ class CurrentSampleView(CurrentView):
         self.selected_spinbox.valueChanged.connect(self.selectedChanged)
         self.selected_spinbox.lineEdit().textChanged.connect(self.selectionTextChanged)
 
+        # Connect gripper interval changes
+        self.gripper_interval_spinbox.valueChanged.connect(
+            self.gripperIntervalChanged)
+
         self.commands_widget_list.append(self.holder_length_label)
         self.commands_widget_list.append(self.holder_length_spinbox)
         self.commands_widget_list.append(self.holder_length_spinboxUnit)
+        self.commands_widget_list.append(self.gripper_interval_label)
+        self.commands_widget_list.append(self.gripper_interval_spinbox)
+        self.commands_widget_list.append(self.gripper_interval_unit)
         self.commands_widget_list.append(self.load_button)
         self.commands_widget_list.append(self.selected_spinbox)
         self.commands_widget_list.append(self.position_label)
@@ -608,20 +646,62 @@ class CurrentSampleView(CurrentView):
             self.holder_length_spinbox.show()
             self.holder_length_spinboxUnit.show()
 
+    def setGripperInterval(self, interval):
+        """Set the gripper deice sample interval value."""
+        if interval is not None:
+            self.gripper_interval_spinbox.setValue(int(interval))
+        else:
+            self.gripper_interval_spinbox.setValue(0)
+
+    def getGripperInterval(self):
+        """Get the current gripper deice sample interval value."""
+        return self.gripper_interval_spinbox.value()
+
+    def hideGripperInterval(self, hide):
+        """Hide or show the gripper interval field."""
+        if hide:
+            self.gripper_interval_label.hide()
+            self.gripper_interval_spinbox.hide()
+            self.gripper_interval_unit.hide()
+        else:
+            self.gripper_interval_label.show()
+            self.gripper_interval_spinbox.show()
+            self.gripper_interval_unit.show()
+
+    def enableGripperInterval(self, enable):
+        """Enable or disable the gripper interval field for editing."""
+        self.gripper_interval_spinbox.setEnabled(enable)
+
+    def gripperIntervalChanged(self, value):
+        """Handle gripper interval value changes from the UI."""
+        try:
+            # Emit signal to notify the main brick about the change
+            self.gripperIntervalChangedSignal.emit(value)
+        except Exception as e:
+            logging.getLogger("HWR").warning(
+                f"Error handling gripper interval change: {e}"
+            )
+
     def setLoaded(self, state):
 
         matrix = self.loaded_matrix_code
 
         if not matrix:
             if self.loaded_location is not None:
-                matrix = "%d:%02d" % (self.loaded_location[0], self.loaded_location[1])
+                matrix = "%d:%02d" % (
+                    self.loaded_location[0], self.loaded_location[1])
             else:
                 matrix = "sample"
 
         if state is None:
-            self.holder_length_label.setEnabled(True)
-            self.holder_length_spinbox.setEnabled(True)
-            self.holder_length_spinboxUnit.setEnabled(True)
+            # Keep holder-length UI read-only (disabled) if not used by HW
+            self.holder_length_label.setEnabled(False)
+            self.holder_length_spinbox.setEnabled(False)
+            self.holder_length_spinboxUnit.setEnabled(False)
+            # Unknown: keep gripper interval editable
+            self.gripper_interval_label.setEnabled(True)
+            self.gripper_interval_spinbox.setEnabled(True)
+            self.gripper_interval_unit.setEnabled(True)
             self.load_button.setText("Mount %s" % matrix)
             self.setStateColor("UNKNOWN")
             self.setStateMsg("Unknown mounting state")
@@ -631,15 +711,24 @@ class CurrentSampleView(CurrentView):
             self.holder_length_label.setEnabled(False)
             self.holder_length_spinbox.setEnabled(False)
             self.holder_length_spinboxUnit.setEnabled(False)
+            # Sample is loaded: keep gripper interval read-only (disabled)
+            self.gripper_interval_label.setEnabled(False)
+            self.gripper_interval_spinbox.setEnabled(False)
+            self.gripper_interval_unit.setEnabled(False)
             self.load_button.setText("Unmount %s" % matrix)
             self.setStateColor("LOADED")
             self.setStateMsg("Sample is mounted")
             if self.unload_icon is not None:
                 self.load_button.setIcon(self.unload_icon)
         else:
-            self.holder_length_label.setEnabled(True)
-            self.holder_length_spinbox.setEnabled(True)
-            self.holder_length_spinboxUnit.setEnabled(True)
+            # No mounted sample: keep holder length read-only and show default
+            self.holder_length_label.setEnabled(False)
+            self.holder_length_spinbox.setEnabled(False)
+            self.holder_length_spinboxUnit.setEnabled(False)
+            # Unloaded: gripper interval editable
+            self.gripper_interval_label.setEnabled(True)
+            self.gripper_interval_spinbox.setEnabled(True)
+            self.gripper_interval_unit.setEnabled(True)
             self.load_button.setText("Mount %s" % matrix)
             self.setStateColor("UNLOADED")
             self.setStateMsg("No mounted sample")
@@ -680,7 +769,8 @@ class CurrentSampleView(CurrentView):
         self.loaded_location = location
         if not self.loaded_matrix_code and location:
             txt = str(self.load_button.text()).split()[0]
-            self.load_button.setText("%s %d:%02d" % (txt, location[0], location[1]))
+            self.load_button.setText("%s %d:%02d" %
+                                     (txt, location[0], location[1]))
 
     def set_number_samples(self, number_of_samples):
         self.selected_spinbox.setRange(1, number_of_samples)
@@ -753,8 +843,10 @@ class StatusView(qt_import.QWidget):
 
         # Qt signal/slot connections ------------------------------------------
         self.reset_button.clicked.connect(self.reset_sample_changer)
-        self.sc_can_load_radiobutton.clicked.connect(self.sampleChangerMoveToLoadingPos)
-        self.minidiff_can_move_radiobutton.clicked.connect(self.minidiffGetControl)
+        self.sc_can_load_radiobutton.clicked.connect(
+            self.sampleChangerMoveToLoadingPos)
+        self.minidiff_can_move_radiobutton.clicked.connect(
+            self.minidiffGetControl)
 
     def setIcons(self, reset_icon):
         self.reset_button.setIcon(icons.load_icon(reset_icon))
@@ -777,6 +869,21 @@ class StatusView(qt_import.QWidget):
 
         enabled = sc_helper.SC_STATE_GENERAL.get(state, False)
         self.status_label.setEnabled(enabled)
+        # If state is Unknown but status text contains an error message,
+        # show it prominently instead of greying out the label.
+        if (
+            state == sc_helper.SampleChangerState.Unknown
+            and self.status_label.text().strip()
+            and any(
+                kw in self.status_label.text().lower()
+                for kw in ("error", "failed", "socket", "timeout")
+            )
+        ):
+            # highlight as error and enable label so the message is visible
+            colors.set_widget_color(self.status_label, colors.LINE_EDIT_ERROR)
+            self.status_label.setEnabled(True)
+            # indicate the error in the group box title as well
+            self.contents_widget.setTitle(f"{state_str} (Error)")
         if state in (
             sc_helper.SampleChangerState.Fault,
             sc_helper.SampleChangerState.Alarm,
@@ -958,6 +1065,19 @@ class SampleChangerBrick(BaseWidget):
         self.current_basket_view = CurrentBasketView(self.contents_widget)
         self.current_sample_view = CurrentSampleView(self.contents_widget)
 
+        # Connect gripper interval changes from the sample view
+        self.current_sample_view.gripperIntervalChangedSignal.connect(
+            self.gripperIntervalChanged)
+
+        # Setup timer for periodic updates from server
+        self.update_timer = qt_import.QTimer()
+        self.update_timer.timeout.connect(self.updateFromServer)
+        self.update_timer.start(5000)  # Update every 5 seconds
+
+        # Track when user makes changes to prevent overwriting
+        self.user_changed_gripper_interval = False
+        self.user_change_timeout = 10000  # 10 seconds timeout for user changes
+
         self.sc_contents_gbox = qt_import.QGroupBox("Contents", self)
         self.sc_contents_gbox.setAlignment(qt_import.Qt.AlignHCenter)
         self.reset_baskets_samples_button = qt_import.QPushButton(
@@ -988,8 +1108,10 @@ class SampleChangerBrick(BaseWidget):
 
         # self.basketsSamplesSelectionDialog = BasketsSamplesSelection(self)
 
-        self.sc_contents_gbox_vlayout = qt_import.QVBoxLayout(self.sc_contents_gbox)
-        self.sc_contents_gbox_vlayout.addWidget(self.reset_baskets_samples_button)
+        self.sc_contents_gbox_vlayout = qt_import.QVBoxLayout(
+            self.sc_contents_gbox)
+        self.sc_contents_gbox_vlayout.addWidget(
+            self.reset_baskets_samples_button)
         self.sc_contents_gbox_vlayout.addWidget(self.double_click_loads_cbox)
         self.sc_contents_gbox_vlayout.addWidget(self.scan_baskets_view)
         self.sc_contents_gbox_vlayout.addWidget(self.operations_widget)
@@ -1000,7 +1122,8 @@ class SampleChangerBrick(BaseWidget):
 
         _contents_widget_vlayout = qt_import.QVBoxLayout(self.contents_widget)
         _contents_widget_vlayout.addWidget(self.status)
-        _contents_widget_vlayout.addWidget(self.switch_to_sample_transfer_button)
+        _contents_widget_vlayout.addWidget(
+            self.switch_to_sample_transfer_button)
         _contents_widget_vlayout.addWidget(self.test_sample_changer_button)
         _contents_widget_vlayout.addWidget(self.current_basket_view)
         _contents_widget_vlayout.addWidget(self.current_sample_view)
@@ -1015,8 +1138,10 @@ class SampleChangerBrick(BaseWidget):
         _main_vlayout.setSpacing(0)
         _main_vlayout.setContentsMargins(0, 0, 0, 0)
 
-        self.test_sample_changer_button.clicked.connect(self.test_sample_changer)
-        self.reset_baskets_samples_button.clicked.connect(self.resetBasketsSamplesInfo)
+        self.test_sample_changer_button.clicked.connect(
+            self.test_sample_changer)
+        self.reset_baskets_samples_button.clicked.connect(
+            self.resetBasketsSamplesInfo)
         # self.status.resetSampleChangerSignal.connect(self.resetSampleChanger)
 
     def property_changed(self, property_name, old_value, new_value):
@@ -1055,7 +1180,7 @@ class SampleChangerBrick(BaseWidget):
                 self.build_basket_view()
 
         elif property_name == "mnemonic":
-             if HWR.beamline.sample_changer is not None:
+            if HWR.beamline.sample_changer is not None:
                 self.connect(
                     HWR.beamline.sample_changer,
                     sc_helper.SampleChanger.STATUS_CHANGED_EVENT,
@@ -1081,11 +1206,13 @@ class SampleChangerBrick(BaseWidget):
                     sc_helper.SampleChanger.LOADED_SAMPLE_CHANGED_EVENT,
                     self.loadedSampleChanged,
                 )
-                self.sc_status_changed(HWR.beamline.sample_changer.get_status())
+                self.sc_status_changed(
+                    HWR.beamline.sample_changer.get_status())
                 self.sc_state_changed(HWR.beamline.sample_changer.get_state())
                 self.infoChanged()
                 self.selectionChanged()
-                self.loadedSampleChanged(HWR.beamline.sample_changer.get_loaded_sample())
+                self.loadedSampleChanged(
+                    HWR.beamline.sample_changer.get_loaded_sample())
         elif property_name == "showSelectButton":
             self.scan_baskets_view.showSelectButton(new_value)
             for basket in self.baskets:
@@ -1097,7 +1224,8 @@ class SampleChangerBrick(BaseWidget):
         elif property_name == "singleClickSelection":
             self.single_click_selection = new_value
         else:
-            BaseWidget.property_changed(self, property_name, old_value, new_value)
+            BaseWidget.property_changed(
+                self, property_name, old_value, new_value)
 
     def build_basket_view(self):
         parts = self.basket_count.split(":")
@@ -1126,13 +1254,15 @@ class SampleChangerBrick(BaseWidget):
                 self.basket_label,
             )
             temp_basket.loadSampleSignal.connect(self.load_this_sample)
-            temp_basket.selectSampleSignal.connect(self.user_select_this_sample)
+            temp_basket.selectSampleSignal.connect(
+                self.user_select_this_sample)
             temp_basket.setChecked(False)
             temp_basket.setEnabled(False)
             self.baskets.append(temp_basket)
             basket_row = basket_index % self.basket_per_column
             basket_column = int(basket_index / self.basket_per_column)
-            self.baskets_grid_layout.addWidget(temp_basket, basket_row, basket_column)
+            self.baskets_grid_layout.addWidget(
+                temp_basket, basket_row, basket_column)
 
     def build_status_view(self, container):
         return StatusView(container)
@@ -1187,6 +1317,9 @@ class SampleChangerBrick(BaseWidget):
         self.current_sample_view.setLoadedLocation(location)
         self.current_sample_view.setLoaded(loaded)
 
+        # Avoid blocking device reads while SC is moving (e.g. autonomous deice).
+        self._refresh_gripper_interval()
+
         self.infoChanged()
 
         if loaded:
@@ -1213,7 +1346,8 @@ class SampleChangerBrick(BaseWidget):
         if self.in_expert_mode is not None:
             self.set_expert_mode(self.in_expert_mode)
         try:
-            self.matrixCodesChanged(HWR.beamline.sample_changer.get_matrix_codes())
+            self.matrixCodesChanged(
+                HWR.beamline.sample_changer.get_matrix_codes())
         except BaseException:
             pass
 
@@ -1231,6 +1365,13 @@ class SampleChangerBrick(BaseWidget):
 
     def sc_status_changed(self, status):
         self.status.setStatusMsg(status)
+        # Re-apply current state so StatusView can react to the new status
+        # (state events often arrive before status; ensure error highlighting)
+        try:
+            state = HWR.beamline.sample_changer.get_state()
+            self.status.setState(state)
+        except Exception:
+            pass
 
     def sc_state_changed(self, state, previous_state=None):
         self.status.setState(state)
@@ -1261,7 +1402,8 @@ class SampleChangerBrick(BaseWidget):
 
     def minidiffGetControl(self):
         if not HWR.beamline.sample_changer.minidiffGetControl():
-            self.status.setMinidiffStatus(HWR.beamline.sample_changer.minidiffCanMove())
+            self.status.setMinidiffStatus(
+                HWR.beamline.sample_changer.minidiffCanMove())
 
     def changeBasket(self, basket_number):
         address = Container.Basket.get_basket_address(basket_number)
@@ -1270,7 +1412,8 @@ class SampleChangerBrick(BaseWidget):
     def changeSample(self, sample_number):
         basket_index = HWR.beamline.sample_changer.getSelectedComponent().get_index()
         basket_number = basket_index + 1
-        address = Container.Pin.get_sample_address(basket_number, sample_number)
+        address = Container.Pin.get_sample_address(
+            basket_number, sample_number)
         HWR.beamline.sample_changer.select(address, wait=False)
 
     def user_select_this_sample(self, basket_index, vial_index):
@@ -1290,7 +1433,8 @@ class SampleChangerBrick(BaseWidget):
     def load_this_sample(self, basket_index, vial_index):
         if self.double_click_loads_cbox.isChecked():
             # holder_len = self.current_sample_view.getHolderLength()
-            HWR.beamline.sample_changer.load((basket_index, vial_index), wait=False)
+            HWR.beamline.sample_changer.load(
+                (basket_index, vial_index), wait=False)
 
     def loadSample(self, holder_len):
         HWR.beamline.sample_changer.load(
@@ -1331,7 +1475,8 @@ class SampleChangerBrick(BaseWidget):
 
     def scanBasket(self):
         if not self["showSelectButton"]:
-            self.baskets[self.current_basket_view.selected.value() - 1].setChecked(True)
+            self.baskets[self.current_basket_view.selected.value() -
+                         1].setChecked(True)
         HWR.beamline.sample_changer.scan(
             HWR.beamline.sample_changer.getSelectedComponent(),
             recursive=True,
@@ -1366,6 +1511,13 @@ class SampleChangerBrick(BaseWidget):
             basket_index = sample.get_container().get_index()
             vial_index = sample.get_index()
             basket_code = sample.get_container().get_id()
+            
+            # Bounds checking to prevent IndexError when sample changer has more baskets/vials than expected
+            if basket_index >= len(presences):
+                continue  # Skip samples in baskets beyond our display capacity
+            if vial_index >= len(presences[basket_index]):
+                continue  # Skip vials beyond our display capacity
+            
             if sample.is_present():
                 if matrix:
                     if sample.has_been_loaded():
@@ -1393,11 +1545,39 @@ class SampleChangerBrick(BaseWidget):
                 presences[basket_index][vial_index] = [VialView.VIAL_NONE, ""]
 
             if sample.is_loaded():
-                presences[basket_index][vial_index] = [VialView.VIAL_AXIS, matrix]
+                presences[basket_index][vial_index] = [
+                    VialView.VIAL_AXIS, matrix]
 
         for basket_index in range(self.basket_count):
             presence = presences[basket_index]
             self.baskets[basket_index].set_matrices(presence)
+
+        self._refresh_gripper_interval()
+
+    def _can_read_gripper_interval(self):
+        sample_changer = HWR.beamline.sample_changer
+        if sample_changer is None:
+            return False
+
+        state = sample_changer.get_state()
+        return state in (
+            sc_helper.SampleChangerState.Ready,
+            sc_helper.SampleChangerState.Loaded,
+            sc_helper.SampleChangerState.StandBy,
+        )
+
+    def _refresh_gripper_interval(self):
+        if not self._can_read_gripper_interval():
+            return
+
+        try:
+            gripper_interval = HWR.beamline.sample_changer.get_gripper_deice_sample_interval()
+            if gripper_interval is not None:
+                self.current_sample_view.setGripperInterval(gripper_interval)
+        except Exception as e:
+            logging.getLogger("HWR").warning(
+                f"Could not get gripper deice sample interval: {e}"
+            )
 
     def select_baskets_samples(self):
         retval = self.basketsSamplesSelectionDialog.exec_loop()
@@ -1411,7 +1591,90 @@ class SampleChangerBrick(BaseWidget):
                 for sample in samples:
                     basket_input[1] = sample
                     basket_input[2] = 1
-                    HWR.beamline.sample_changer.set_basket_sample_information(basket_input)
+                    HWR.beamline.sample_changer.set_basket_sample_information(
+                        basket_input)
 
     def test_sample_changer(self):
         HWR.beamline.sample_changer.run_test()
+
+    def gripperIntervalChanged(self, value):
+        """Handle gripper interval changes from the UI and send to server."""
+        try:
+            if HWR.beamline.sample_changer is not None:
+                # Mark that user made a change
+                self.user_changed_gripper_interval = True
+
+                # Send the new value to the server
+                success = HWR.beamline.sample_changer.set_gripper_deice_sample_interval(
+                    value)
+                if success:
+                    logging.getLogger("HWR").info(
+                        f"Gripper interval successfully updated to: {value}"
+                    )
+                    # Start a timer to reset the user change flag
+                    qt_import.QTimer.singleShot(
+                        self.user_change_timeout,
+                        lambda: self._resetUserChangeFlag()
+                    )
+                else:
+                    logging.getLogger("HWR").warning(
+                        f"Failed to update gripper interval to: {value}"
+                    )
+                    # Reset flag immediately on failure
+                    self.user_changed_gripper_interval = False
+        except Exception as e:
+            logging.getLogger("HWR").error(
+                f"Error updating gripper interval on server: {e}"
+            )
+            # Reset flag on error
+            self.user_changed_gripper_interval = False
+
+    def updateFromServer(self):
+        """Periodically update the gripper interval from the server."""
+        try:
+            if HWR.beamline.sample_changer is not None:
+                # Don't update if user recently made a change
+                if self.user_changed_gripper_interval:
+                    logging.getLogger("HWR").debug(
+                        "Skipping server update - user recently changed value"
+                    )
+                    return
+
+                self._updateGripperIntervalFromServer()
+        except Exception as e:
+            logging.getLogger("HWR").debug(
+                f"Error updating from server: {e}"
+            )
+
+    def _updateGripperIntervalFromServer(self):
+        """Internal method to update gripper interval from server (bypasses user change protection)."""
+        try:
+            if not self._can_read_gripper_interval():
+                return
+
+            gripper_interval = HWR.beamline.sample_changer.get_gripper_deice_sample_interval()
+            if gripper_interval is not None:
+                # Only update if the value has actually changed
+                current_value = self.current_sample_view.getGripperInterval()
+                # Integer comparison - no tolerance needed
+                if gripper_interval != current_value:
+                    self.current_sample_view.setGripperInterval(
+                        gripper_interval)
+                    logging.getLogger("HWR").debug(
+                        f"Updated gripper interval from server: {gripper_interval}"
+                    )
+        except Exception as e:
+            logging.getLogger("HWR").debug(
+                f"Error updating gripper interval from server: {e}"
+            )
+
+    def forceRefreshFromServer(self):
+        """Force refresh from server, bypassing user change protection."""
+        self.user_changed_gripper_interval = False
+        self._updateGripperIntervalFromServer()
+        logging.getLogger("HWR").info("Forced refresh from server")
+
+    def _resetUserChangeFlag(self):
+        """Helper method to reset the user change flag."""
+        self.user_changed_gripper_interval = False
+

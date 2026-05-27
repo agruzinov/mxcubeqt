@@ -105,9 +105,12 @@ class CreateSsxWidget(CreateTaskBase):
         )
 
         # Other ---------------------------------------------------------------
-        self._processing_widget.processing_widget.run_online_processing_cbox.setChecked(
-            HWR.beamline.config.run_online_processing
-        )
+        if not HWR.beamline.online_processing_methods:
+            self._processing_widget.processing_widget.run_online_processing_cbox.setChecked(False)
+        else:
+            self._processing_widget.processing_widget.run_online_processing_cbox.setChecked(
+                HWR.beamline.run_online_processing
+            )
 
         #Rename to self._processing_widget.layout
         self._processing_widget.processing_widget.resolution_cutoff_label.setHidden(False)

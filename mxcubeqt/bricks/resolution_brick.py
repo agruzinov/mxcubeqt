@@ -390,7 +390,7 @@ class ResolutionBrick(BaseWidget):
                 color = colors.LIGHT_RED
 
             unit = self.units_combobox.currentText()
-            if unit is chr(197):
+            if unit == chr(197):
                 if state == detector_distance.STATES.READY:
                     self.new_value_ledit.blockSignals(True)
                     self.new_value_ledit.setText("")
@@ -417,6 +417,8 @@ class ResolutionBrick(BaseWidget):
         if state == detector_distance.STATES.FAULT:
             self.setEnabled(False)
             return
+
+        self.setEnabled(self.door_interlocked)
 
         if unit == "mm":
             if state == detector_distance.STATES.READY:

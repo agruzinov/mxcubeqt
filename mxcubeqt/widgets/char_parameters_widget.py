@@ -456,10 +456,13 @@ class CharParametersWidget(qt_import.QWidget):
             image = self._data_collection.acquisitions[
                 0
             ].acquisition_parameters.centred_position.snapshot_image
-            ration = image.height() / float(image.width())
+            ration = image.height() / float(image.width()) if image.width() else 1.0
+            scaled_width = int(400)
+            # QImage.scaled requires ints; round to avoid float inputs that crash the queue refresh.
+            scaled_height = max(1, int(round(scaled_width * ration)))
             image = image.scaled(
-                400,
-                400 * ration,
+                scaled_width,
+                scaled_height,
                 qt_import.Qt.KeepAspectRatio,
                 qt_import.Qt.SmoothTransformation,
             )

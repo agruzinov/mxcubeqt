@@ -21,6 +21,9 @@ import logging
 import re
 import importlib
 
+
+from mxcubecore.model.queue_model_objects import PathTemplate
+
 from mxcubeqt.utils import icons, queue_item, qt_import
 from mxcubeqt.widgets.create_discrete_widget import CreateDiscreteWidget
 from mxcubeqt.widgets.create_helical_widget import CreateHelicalWidget
@@ -57,6 +60,7 @@ class TaskToolBoxWidget(qt_import.QWidget):
         self.acq_conflict = False
         self.enable_collect = False
         self.create_task_widgets = {}
+        self.custom_folder = None
 
         # Graphic elements ----------------------------------------------------
         self.method_label = qt_import.QLabel("Collection method", self)
@@ -69,16 +73,20 @@ class TaskToolBoxWidget(qt_import.QWidget):
         self.discrete_page = CreateDiscreteWidget(self.tool_box, "Discrete")
         self.char_page = CreateCharWidget(self.tool_box, "Characterise")
         self.helical_page = CreateHelicalWidget(self.tool_box, "helical_page")
-        self.energy_scan_page = CreateEnergyScanWidget(self.tool_box, "energy_scan")
-        self.xrf_spectrum_page = CreateXRFSpectrumWidget(self.tool_box, "xrf_spectrum")
+        self.energy_scan_page = CreateEnergyScanWidget(
+            self.tool_box, "energy_scan")
+        self.xrf_spectrum_page = CreateXRFSpectrumWidget(
+            self.tool_box, "xrf_spectrum")
         if HWR.beamline.gphl_workflow is not None:
             self.gphl_workflow_page = CreateGphlWorkflowWidget(
                 self.tool_box, "gphl_workflow"
             )
         else:
             self.gphl_workflow_page = None
-        self.advanced_page = CreateAdvancedWidget(self.tool_box, "advanced_scan")
-        self.xray_imaging_page = CreateXrayImagingWidget(self.tool_box, "xray_imaging")
+        self.advanced_page = CreateAdvancedWidget(
+            self.tool_box, "advanced_scan")
+        self.xray_imaging_page = CreateXrayImagingWidget(
+            self.tool_box, "xray_imaging")
         self.ssx_page = CreateSsxWidget(self.tool_box, "ssx")
 
         self.tool_box.addItem(self.discrete_page, "Standard Collection")
@@ -101,7 +109,8 @@ class TaskToolBoxWidget(qt_import.QWidget):
         self.create_task_button.setToolTip(msg)
         self.create_task_button.setEnabled(False)
 
-        self.collect_now_button = qt_import.QPushButton("Collect Now", self.button_box)
+        self.collect_now_button = qt_import.QPushButton(
+            "Collect Now", self.button_box)
         self.collect_now_button.setIcon(icons.load_icon("VCRPlay2.png"))
         self.collect_now_button.setToolTip(
             "Add the collection method to the queue and execute it"
@@ -148,7 +157,7 @@ class TaskToolBoxWidget(qt_import.QWidget):
         if (
             HWR.beamline.energy_scan is None
             or in_plate_mode
-            or not HWR.beamline.config.tunable_wavelength
+            or not HWR.beamline.tunable_wavelength
         ):
             self.hide_task(self.energy_scan_page)
             logging.getLogger("HWR").info("Energy scan task not available")
@@ -173,15 +182,18 @@ class TaskToolBoxWidget(qt_import.QWidget):
             create_task_widget_cls = getattr(
                 importlib.import_module(module_name), class_name
             )
-            create_task_widget = create_task_widget_cls(self.tool_box, task_name)
+            create_task_widget = create_task_widget_cls(
+                self.tool_box, task_name)
             self.tool_box.addItem(create_task_widget, task_name.title())
             self.create_task_widgets[task_name] = create_task_widget
 
     def adjust_width(self, width):
         # Adjust periodic table width
         if width > -1:
-            self.energy_scan_page._periodic_table_widget.setFixedWidth(width - 4)
-            self.energy_scan_page._periodic_table_widget.setFixedHeight(int(width / 1.5))
+            self.energy_scan_page._periodic_table_widget.setFixedWidth(
+                width - 4)
+            self.energy_scan_page._periodic_table_widget.setFixedHeight(
+                int(width / 1.5))
 
     def set_expert_mode(self, state):
         for i in range(0, self.tool_box.count()):
@@ -303,14 +315,76 @@ class TaskToolBoxWidget(qt_import.QWidget):
         """
         title = "<b>Collection method template</b>"
 
-        if len(items) == 1:
-            self.create_task_button.setEnabled(False)
-            data_model = items[0].get_model()
-            title = "<b>%s</b>" % data_model.get_display_name()
+        current_page = self.tool_box.currentWidget()
 
-            if not isinstance(items[0], queue_item.DataCollectionGroupQueueItem):
+        # Before updating the path template, save the current custom folder
+        if hasattr(current_page, '_path_template') and current_page._path_template:
+            current_directory = current_page._path_template.directory
+            default_directory = HWR.beamline.session.get_base_image_directory() or "/gpfs/current/raw"
+            if current_directory != default_directory:
+                self.custom_folder = current_directory
+            else:
+                self.custom_folder = None
+
+        if len(items) == 1:
+            item = items[0]
+            data_model = item.get_model()
+            title = f"<b>{data_model.get_display_name()}</b>"
+
+            # Ensure prefix/path isolation
+            if isinstance(item, queue_item.SampleQueueItem):
+                display_name = data_model.get_display_name()
+                m = re.match(
+                    r"(?P<puckno>\d+):(?P<sampleno>\d+)$", display_name)
+                if m:
+                    puckno = int(m.group('puckno'))
+                    sampleno = int(m.group('sampleno'))
+                    base_prefix = f"puck{puckno:02d}_sample{sampleno:02d}"
+                else:
+                    base_prefix = display_name
+
+                # Attempt to reuse model path template if present
+                model_path = data_model.get_path_template()
+                directory = getattr(model_path, "directory", None)
+                archive_directory = getattr(
+                    model_path, "archive_directory", None)
+                process_directory = getattr(
+                    model_path, "process_directory", None)
+
+                if not directory:
+                    directory = HWR.beamline.session.get_base_image_directory() or "/gpfs/current/raw"
+                if not archive_directory:
+                    archive_directory = directory
+                if not process_directory:
+                    process_directory = "/gpfs/current/processed"
+
+                pt = PathTemplate()
+                pt.base_prefix = base_prefix
+
+                # Preserve custom folder from current path template if it exists
+                current_pt = current_page._path_template if hasattr(
+                    current_page, '_path_template') else None
+                if current_pt and current_pt.directory != HWR.beamline.session.get_base_image_directory():
+                    # Use the current custom directory
+                    pt.directory = current_pt.directory
+                    # Safely get archive_directory, fallback to directory if not set
+                    pt.archive_directory = getattr(current_pt, 'archive_directory', None) or current_pt.directory
+                    pt.process_directory = current_pt.process_directory
+                else:
+                    # Use the provided directories
+                    pt.directory = directory
+                    pt.archive_directory = archive_directory or directory
+                    pt.process_directory = process_directory
+
+                # Get the next run number after setting the directory
+                pt.run_number = HWR.beamline.queue_model.get_next_run_number(
+                    pt)
+
+                current_page._path_template = pt
                 self.create_task_button.setEnabled(True)
-            if isinstance(items[0], queue_item.DataCollectionQueueItem):
+
+            elif isinstance(item, queue_item.DataCollectionQueueItem):
+                # Switch page based on type
                 if data_model.is_helical():
                     self.tool_box.setCurrentWidget(self.helical_page)
                 elif data_model.is_mesh():
@@ -319,40 +393,53 @@ class TaskToolBoxWidget(qt_import.QWidget):
                     self.tool_box.setCurrentWidget(self.ssx_page)
                 else:
                     self.tool_box.setCurrentWidget(self.discrete_page)
-            elif isinstance(items[0], queue_item.CharacterisationQueueItem):
+
+                # Copy path template from data model if available
+                model_path_template = data_model.get_path_template()
+                if model_path_template:
+                    current_page._path_template = model_path_template
+
+                self.create_task_button.setEnabled(True)
+
+            elif isinstance(item, queue_item.CharacterisationQueueItem):
                 self.tool_box.setCurrentWidget(self.char_page)
-            elif isinstance(items[0], queue_item.EnergyScanQueueItem):
+                self.create_task_button.setEnabled(True)
+
+            elif isinstance(item, queue_item.EnergyScanQueueItem):
                 self.tool_box.setCurrentWidget(self.energy_scan_page)
-            elif isinstance(items[0], queue_item.XRFSpectrumQueueItem):
+                self.create_task_button.setEnabled(True)
+
+            elif isinstance(item, queue_item.XRFSpectrumQueueItem):
                 self.tool_box.setCurrentWidget(self.xrf_spectrum_page)
-            elif isinstance(items[0], queue_item.GphlWorkflowQueueItem):
+                self.create_task_button.setEnabled(True)
+
+            elif isinstance(item, queue_item.GphlWorkflowQueueItem):
                 self.tool_box.setCurrentWidget(self.gphl_workflow_page)
-            elif isinstance(items[0], queue_item.GenericWorkflowQueueItem):
+                self.create_task_button.setEnabled(True)
+
+            elif isinstance(item, queue_item.GenericWorkflowQueueItem):
                 self.tool_box.setCurrentWidget(self.workflow_page)
-            elif isinstance(items[0], queue_item.XrayCenteringQueueItem):
+                self.create_task_button.setEnabled(True)
+
+            elif isinstance(item, queue_item.XrayCenteringQueueItem):
                 self.tool_box.setCurrentWidget(self.advanced_page)
-            elif isinstance(items[0], queue_item.XrayImagingQueueItem):
+                self.create_task_button.setEnabled(True)
+
+            elif isinstance(item, queue_item.XrayImagingQueueItem):
                 self.tool_box.setCurrentWidget(self.xray_imaging_page)
+                self.create_task_button.setEnabled(True)
 
-            elif isinstance(items[0], queue_item.SampleQueueItem):
-                title = "<b>Sample: %s</b>" % data_model.get_display_name()
-                display_name = data_model.get_display_name()
-                m = re.match("(?P<puckno>\d+)\:(?P<sampleno>\d+)$", display_name)
-                if m:
-                    puckno = int(m.group('puckno'))
-                    sampleno = int(m.group('sampleno'))
-                    base_prefix = "puck%02d_sample%02d" % (puckno, sampleno)
-                else:
-                    base_prefix = display_name
+            else:
+                current_page.selection_changed(items)
 
-                current_page = self.tool_box.currentWidget()
-                current_page._path_template.base_prefix = base_prefix
-            self.method_label.setText(title)
         else:
             self.create_task_button.setEnabled(True)
 
-        current_page = self.tool_box.currentWidget()
         current_page.selection_changed(items)
+        self.method_label.setText(title)
+
+        # After changing selection, always verify button states
+        self.toggle_queue_button_enable()
 
     def create_task_button_click(self):
         if self.tool_box.currentWidget().approve_creation():
@@ -366,11 +453,46 @@ class TaskToolBoxWidget(qt_import.QWidget):
                 for item in items:
                     shapes = HWR.beamline.sample_view.get_selected_points()
                     task_model = item.get_model()
-                    # TODO Consider if GPhL workflow needs task-per-shape
-                    # like xrf does
 
-                    # Create a new group if sample is selected
+                    # Update _path_template for this specific sample
                     if isinstance(task_model, queue_model_objects.Sample):
+                        display_name = task_model.get_display_name()
+                        m = re.match(
+                            r"(?P<puckno>\d+):(?P<sampleno>\d+)$", display_name)
+                        if m:
+                            puckno = int(m.group('puckno'))
+                            sampleno = int(m.group('sampleno'))
+                            base_prefix = f"puck{puckno:02d}_sample{sampleno:02d}"
+                        else:
+                            base_prefix = display_name
+
+                        # Set up a fresh PathTemplate for this sample
+                        pt = PathTemplate()
+                        pt.base_prefix = base_prefix
+
+                        # Preserve custom folder from current path template if it exists
+                        current_pt = self.tool_box.currentWidget()._path_template if hasattr(
+                            self.tool_box.currentWidget(), '_path_template') else None
+                        if current_pt and current_pt.directory != HWR.beamline.session.get_base_image_directory():
+                            # Use the current custom directory
+                            pt.directory = current_pt.directory
+                            # Safely get archive_directory, fallback to directory if not set
+                            pt.archive_directory = getattr(current_pt, 'archive_directory', None) or current_pt.directory
+                            pt.process_directory = current_pt.process_directory
+                        else:
+                            # Use default directories
+                            pt.directory = HWR.beamline.session.get_base_image_directory() or "/gpfs/current/raw"
+                            pt.archive_directory = pt.directory
+                            pt.process_directory = "/gpfs/current/processed"
+
+                        # Get the next run number after setting the directory
+                        pt.run_number = HWR.beamline.queue_model.get_next_run_number(
+                            pt)
+
+                        # Assign the new path template to the current widget
+                        self.tool_box.currentWidget()._path_template = pt
+
+                        # Create a new group if sample is selected
                         task_model = self.create_task_group(task_model)
                         if self.tool_box.currentWidget() in (
                             self.discrete_page,
@@ -378,13 +500,47 @@ class TaskToolBoxWidget(qt_import.QWidget):
                             self.energy_scan_page,
                             self.xrf_spectrum_page,
                         ) and len(shapes):
-                            # This could be done in more nicer way...
                             for shape in shapes:
                                 self.create_task(task_model, shape)
                         else:
                             self.create_task(task_model)
+
                     elif isinstance(task_model, queue_model_objects.Basket):
                         for sample_node in task_model.get_sample_list():
+                            display_name = sample_node.get_display_name()
+                            m = re.match(
+                                r"(?P<puckno>\d+):(?P<sampleno>\d+)$", display_name)
+                            if m:
+                                puckno = int(m.group('puckno'))
+                                sampleno = int(m.group('sampleno'))
+                                base_prefix = f"puck{puckno:02d}_sample{sampleno:02d}"
+                            else:
+                                base_prefix = display_name
+
+                            pt = PathTemplate()
+                            pt.base_prefix = base_prefix
+
+                            # Preserve custom folder from current path template if it exists
+                            current_pt = self.tool_box.currentWidget()._path_template if hasattr(
+                                self.tool_box.currentWidget(), '_path_template') else None
+                            if current_pt and current_pt.directory != HWR.beamline.session.get_base_image_directory():
+                                # Use the current custom directory
+                                pt.directory = current_pt.directory
+                                # Safely get archive_directory, fallback to directory if not set
+                                pt.archive_directory = getattr(current_pt, 'archive_directory', None) or current_pt.directory
+                                pt.process_directory = current_pt.process_directory
+                            else:
+                                # Use default directories
+                                pt.directory = HWR.beamline.session.get_base_image_directory() or "/gpfs/current/raw"
+                                pt.archive_directory = pt.directory
+                                pt.process_directory = "/gpfs/current/processed"
+
+                            # Get the next run number after setting the directory
+                            pt.run_number = HWR.beamline.queue_model.get_next_run_number(
+                                pt)
+
+                            self.tool_box.currentWidget()._path_template = pt
+
                             task_group = self.create_task_group(sample_node)
                             if self.tool_box.currentWidget() in (
                                 self.discrete_page,
@@ -471,9 +627,9 @@ class TaskToolBoxWidget(qt_import.QWidget):
 
         for item in selected_items:
             if isinstance(item, (
-                queue_item.SampleQueueItem,
-                queue_item.OpticalCentringQueueItem,
-                queue_item.XrayCenteringQueueItem)):
+                    queue_item.SampleQueueItem,
+                    queue_item.OpticalCentringQueueItem,
+                    queue_item.XrayCenteringQueueItem)):
                 if item != mounted_sample_item:
                     will_mount_sample = True
             else:
@@ -486,21 +642,20 @@ class TaskToolBoxWidget(qt_import.QWidget):
                        "Before collecting sample(s) will be mounted. Continue?"
             if (
                 qt_import.QMessageBox.warning(
-                      None, "Question", conf_msg,
-                      qt_import.QMessageBox.Ok, qt_import.QMessageBox.No
+                    None, "Question", conf_msg,
+                    qt_import.QMessageBox.Ok, qt_import.QMessageBox.No
                 )
                 == qt_import.QMessageBox.No
             ):
                 return
 
-
         self.create_task_button_click()
         collect_items = []
         for item in self.tree_brick.dc_tree_widget.get_collect_items():
             if isinstance(item, (
-                queue_item.SampleCentringQueueItem,
-                queue_item.OpticalCentringQueueItem,
-                queue_item.XrayCenteringQueueItem)):
+                    queue_item.SampleCentringQueueItem,
+                    queue_item.OpticalCentringQueueItem,
+                    queue_item.XrayCenteringQueueItem)):
                 item.setOn(False)
                 item.setText(1, "Skipped")
                 item.set_strike_out(True)
@@ -529,15 +684,20 @@ class TaskToolBoxWidget(qt_import.QWidget):
     def toggle_queue_button_enable(self):
         enable_create_task_button = False
         enable_collect_now_button = False
-        if self.tree_brick.get_selected_items():
+
+        if self.tree_brick and self.tree_brick.get_selected_items():
             enable_create_task_button = not self.path_conflict and not self.acq_conflict
             enable_collect_now_button = enable_create_task_button and self.enable_collect
-            if self.tool_box.currentWidget() in (self.helical_page, self.advanced_page):
-                if len(self.tool_box.currentWidget().get_selected_shapes()) == 0:
+
+            current_widget = self.tool_box.currentWidget()
+            if current_widget in (self.helical_page, self.advanced_page):
+                if len(current_widget.get_selected_shapes()) == 0:
                     enable_create_task_button = False
                     enable_collect_now_button = False
-            elif self.tool_box.currentWidget() == self.xray_imaging_page:
+            elif current_widget == self.xray_imaging_page:
                 enable_create_task_button = True
                 enable_collect_now_button = True
+
         self.create_task_button.setEnabled(enable_create_task_button)
         self.collect_now_button.setEnabled(enable_collect_now_button)
+

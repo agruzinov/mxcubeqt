@@ -117,7 +117,8 @@ class CatsSimpleBrick(SampleChangerBrick):
 
     def property_changed(self, property_name, old_value, new_value):
         if property_name == "mnemonic":
-            if HWR.beamline.sample_changer is not None:
+            # Only disconnect if device exists (not None)
+            if self.device is not None and HWR.beamline.sample_changer is not None:
                 self.disconnect(
                     self.device, "runningStateChanged", self._updatePathRunning
                 )

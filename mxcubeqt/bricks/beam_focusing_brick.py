@@ -19,16 +19,17 @@
 
 from mxcubeqt.utils import colors, qt_import
 from mxcubeqt.base_components import BaseWidget
+import logging
+import gevent
 
 
 __credits__ = ["MXCuBE collaboration"]
 __license__ = "LGPLv3+"
-__category__ = "Beam definition"
+__category__ = "DESY"
 
 
 class BeamFocusingBrick(BaseWidget):
     def __init__(self, *args):
-
         BaseWidget.__init__(self, *args)
 
         # Hardware objects ----------------------------------------------------
@@ -44,7 +45,7 @@ class BeamFocusingBrick(BaseWidget):
         # Slots ---------------------------------------------------------------
 
         # Graphic elements ----------------------------------------------------
-        _main_groupbox = qt_import.QGroupBox("Beamline mode", self)
+        _main_groupbox = qt_import.QGroupBox("Beam focus", self)
         self.beam_focusing_combo = qt_import.QComboBox(_main_groupbox)
         self.beam_focusing_combo.setMinimumWidth(100)
 
@@ -69,15 +70,19 @@ class BeamFocusingBrick(BaseWidget):
         colors.set_widget_color(
             self.beam_focusing_combo, colors.LIGHT_GREEN, qt_import.QPalette.Button
         )
-
+    
     def property_changed(self, property_name, old_value, new_value):
-
         if property_name == "mnemonic":
             if self.beam_focusing_hwobj is not None:
                 self.disconnect(
                     self.beam_focusing_hwobj,
                     "focusingModeChanged",
                     self.focus_mode_changed,
+                )
+                self.disconnect(
+                    self.beam_focusing_hwobj,
+                    "stateChanged",
+                    self.beam_state_changed,
                 )
 
             self.beam_focusing_hwobj = self.get_hardware_object(new_value)
@@ -88,11 +93,21 @@ class BeamFocusingBrick(BaseWidget):
                     "focusingModeChanged",
                     self.focus_mode_changed,
                 )
+                self.connect(
+                    self.beam_focusing_hwobj,
+                    "stateChanged",
+                    self.beam_state_changed,
+                )
+
+                # First, fill the combo box
+                self.init_focus_mode_combo()
+
+                # Now get the current focus mode and update it
                 mode, beam_size = self.beam_focusing_hwobj.get_active_focus_mode()
                 self.focus_mode_changed(mode, beam_size)
         else:
             BaseWidget.property_changed(self, property_name, old_value, new_value)
-
+    
     def init_focus_mode_combo(self):
         self.beam_focusing_combo.blockSignals(True)
         self.beam_focusing_combo.clear()
@@ -106,27 +121,42 @@ class BeamFocusingBrick(BaseWidget):
         txt = self.beam_focusing_hwobj.get_focus_mode_message(focus_mode_name)
 
         if len(txt) > 0:
-            confDialog = qt_import.QMessageBox.warning(
-                None,
-                "Focus mode",
-                txt,
-                qt_import.QMessageBox.Ok,
-                qt_import.QMessageBox.Cancel,
+            confDialog = qt_import.QMessageBox(
+                self
+            )  # Assign parent to avoid closing issues
+            confDialog.setIcon(qt_import.QMessageBox.Warning)
+            confDialog.setWindowTitle("Focus mode")
+            confDialog.setText(txt)
+            confDialog.setStandardButtons(
+                qt_import.QMessageBox.Ok | qt_import.QMessageBox.Cancel
             )
-            if confDialog == qt_import.QMessageBox.Ok:
+
+            result = confDialog.exec_()  # Use exec_() safely
+
+            if result == qt_import.QMessageBox.Ok:
                 self.beam_focusing_combo.setCurrentIndex(-1)
-                self.beam_focusing_hwobj.set_focus_mode(focus_mode_name)
+                gevent.spawn(self.beam_focusing_hwobj.set_focus_mode, focus_mode_name)
             else:
                 self.beam_focusing_combo.setCurrentIndex(
                     self.beam_focusing_combo.findText(self.active_focus_mode)
                 )
         else:
             self.beam_focusing_combo.setCurrentIndex(-1)
-            self.beam_focusing_hwobj.set_focus_mode(focus_mode_name)
+            gevent.spawn(self.beam_focusing_hwobj.set_focus_mode, focus_mode_name)
+
+    def beam_state_changed(self, state):
+        """Turn the combo yellow while benders are moving, green when ready."""
+        if isinstance(state, (list, tuple)):
+            state = state[0]
+        colors.set_widget_color_by_state(
+            self.beam_focusing_combo, state, qt_import.QPalette.Button
+        )
 
     def focus_mode_changed(self, new_focus_mode, beam_size):
+        """Updates the focus mode dropdown when the beam size changes."""
         self.active_focus_mode = new_focus_mode
         self.beam_focusing_combo.blockSignals(True)
+    
         if self.active_focus_mode is None:
             self.beam_focusing_combo.clear()
             self.setEnabled(False)
@@ -136,5 +166,8 @@ class BeamFocusingBrick(BaseWidget):
             self.setEnabled(True)
             index = self.beam_focusing_combo.findText(self.active_focus_mode)
             self.beam_focusing_combo.setCurrentIndex(index)
-
+    
         self.beam_focusing_combo.blockSignals(False)
+    
+        logging.debug(f"Focus mode changed: {new_focus_mode}, Beam size: {beam_size}")
+    

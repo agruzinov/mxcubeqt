@@ -68,13 +68,15 @@ class SampleControlBrick(BaseWidget):
         self.draw_grid_button = MonoStateButton(self, "Grid", "Grid")
         self.auto_focus_button = MonoStateButton(self, "Focus", "Eyeball")
         self.snapshot_button = MonoStateButton(self, "Snapshot", "Camera")
-        self.refresh_camera_button = MonoStateButton(self, "Refresh", "Refresh")
+        self.refresh_camera_button = MonoStateButton(
+            self, "Refresh", "Refresh")
         self.visual_align_button = MonoStateButton(self, "Align", "Align")
         self.select_all_button = MonoStateButton(self, "Select all", "Check")
         self.clear_all_button = MonoStateButton(self, "Clear all", "Delete")
         self.auto_center_button = MonoStateButton(self, "Auto", "VCRPlay2")
         self.auto_center_button.setText("Auto")
-        self.realign_button = MonoStateButton(self, "Realign beam", "QuickRealign")
+        self.realign_button = MonoStateButton(
+            self, "Realign beam", "QuickRealign")
 
         # Layout --------------------------------------------------------------
         _main_vlayout = qt_import.QVBoxLayout(self)
@@ -96,7 +98,8 @@ class SampleControlBrick(BaseWidget):
         _main_vlayout.setContentsMargins(0, 0, 0, 0)
 
         # Qt signal/slot connections ------------------------------------------
-        self.centre_button.commandExecuteSignal.connect(self.centre_button_clicked)
+        self.centre_button.commandExecuteSignal.connect(
+            self.centre_button_clicked)
         self.accept_button.clicked.connect(self.accept_clicked)
         self.reject_button.clicked.connect(self.reject_clicked)
         self.create_line_button.clicked.connect(create_line_clicked)
@@ -124,8 +127,10 @@ class SampleControlBrick(BaseWidget):
         self.clear_all_button.setToolTip("Clear all items")
         # self.instanceSynchronize("")
 
-        self.connect(HWR.beamline.sample_view, "centringStarted", self.centring_started)
-        self.connect(HWR.beamline.sample_view, "centringFailed", self.centring_failed)
+        self.connect(HWR.beamline.sample_view,
+                     "centringStarted", self.centring_started)
+        self.connect(HWR.beamline.sample_view,
+                     "centringFailed", self.centring_failed)
         self.connect(
             HWR.beamline.sample_view, "centringSuccessful", self.centring_successful
         )
@@ -147,7 +152,8 @@ class SampleControlBrick(BaseWidget):
         elif property_name == "enableRealignBeam":
             self.realign_button.setVisible(new_value)
         else:
-            BaseWidget.property_changed(self, property_name, old_value, new_value)
+            BaseWidget.property_changed(
+                self, property_name, old_value, new_value)
 
     def centre_button_clicked(self, state):
         if state:
@@ -157,37 +163,137 @@ class SampleControlBrick(BaseWidget):
             self.accept_button.setEnabled(True)
 
     def save_snapshot_clicked(self):
-        formats = [
-            "*.%s" % str(image_format).lower()
-            for image_format in qt_import.QImageWriter.supportedImageFormats()
-        ]
+        logging.getLogger().info("Saving snapshot...")
 
-        current_file_name = "%s/%s_%d.%s" % (
-            expanduser("~"),
-            self.prefix,
-            self.file_index,
-            "png",
-        )
-        filename = str(
-            qt_import.QFileDialog.getSaveFileName(
-                self,
-                "Choose a filename to save under",
-                current_file_name,
-                "Image files (%s)" % " ".join(formats),
-            )
-        )
+        # Add safety check to prevent multiple simultaneous operations
+        if hasattr(self, '_snapshot_in_progress') and self._snapshot_in_progress:
+            logging.getLogger().warning("Snapshot already in progress, ignoring request")
+            return
 
-        if len(filename):
+        self._snapshot_in_progress = True
+
+        try:
+            # Check for writable directories in order of preference
+            import os
+            possible_dirs = [
+                "/gpfs/current/processed",
+                "/gpfs/local/shared",
+                expanduser("~"),
+                "/tmp"
+            ]
+
+            save_dir = None
+            for directory in possible_dirs:
+                if os.path.exists(directory) and os.access(directory, os.W_OK):
+                    save_dir = directory
+                    logging.getLogger().info("Using writable directory: %s", save_dir)
+                    break
+                else:
+                    logging.getLogger().info("Directory not writable or doesn't exist: %s", directory)
+
+            if save_dir is None:
+                logging.getLogger().error("No writable directory found!")
+                return
+
+            # Create manual_snapshots subdirectory
+            manual_snapshots_dir = os.path.join(save_dir, "manual_snapshots")
             try:
-                HWR.beamline.sample_view.save_scene_snapshot(filename)
-                self.file_index += 1
-            except BaseException:
-                logging.getLogger().exception("HutchMenuBrick: error saving snapshot!")
+                if not os.path.exists(manual_snapshots_dir):
+                    os.makedirs(manual_snapshots_dir, exist_ok=True)
+                    logging.getLogger().info("Created manual_snapshots directory: %s", manual_snapshots_dir)
+                else:
+                    logging.getLogger().info(
+                        "Using existing manual_snapshots directory: %s", manual_snapshots_dir)
+            except Exception as e:
+                logging.getLogger().error("Failed to create manual_snapshots directory: %s", str(e))
+                # Fallback to parent directory
+                manual_snapshots_dir = save_dir
+                logging.getLogger().info("Falling back to parent directory: %s", manual_snapshots_dir)
+
+            # Generate filename with timestamp to avoid conflicts
+            import time
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            current_file_name = "%s/%s_%s.png" % (
+                manual_snapshots_dir,
+                self.prefix,
+                timestamp
+            )
+
+            logging.getLogger().info("Saving snapshot to: %s", current_file_name)
+
+            # Try to save the snapshot directly
+            try:
+                HWR.beamline.sample_view.save_scene_snapshot(current_file_name)
+                logging.getLogger().info("Snapshot saved successfully to: %s", current_file_name)
+
+                # Also save raw camera frames from overview (zoom0) and zoom (zoom1)
+                try:
+                    camera = HWR.beamline.sample_view.camera
+                    if hasattr(camera, 'save_raw_snapshot'):
+                        overview_file = "%s/%s_%s_zoom0.png" % (
+                            manual_snapshots_dir, self.prefix, timestamp)
+                        zoom_file = "%s/%s_%s_zoom1.png" % (
+                            manual_snapshots_dir, self.prefix, timestamp)
+                        camera.save_raw_snapshot(overview_file, use_overview=True)
+                        camera.save_raw_snapshot(zoom_file, use_overview=False)
+                except Exception as cam_err:
+                    logging.getLogger().warning(
+                        "Could not save raw camera frames: %s", str(cam_err))
+
+                # Show a simple success message (with safety measures)
+                try:
+                    # Create message box as instance variable to prevent double deletion
+                    if not hasattr(self, '_msg_box'):
+                        self._msg_box = None
+
+                    if self._msg_box is not None:
+                        self._msg_box.close()
+                        self._msg_box = None
+
+                    self._msg_box = qt_import.QMessageBox(self)
+                    self._msg_box.setWindowTitle("Snapshot Saved")
+                    self._msg_box.setText(
+                        f"Snapshot saved to:\n{current_file_name}")
+                    self._msg_box.setIcon(qt_import.QMessageBox.Information)
+                    self._msg_box.setStandardButtons(qt_import.QMessageBox.Ok)
+                    self._msg_box.show()
+
+                    # Auto-close after 3 seconds to prevent memory issues
+                    qt_import.QTimer.singleShot(
+                        3000, lambda: self._msg_box.close() if self._msg_box else None)
+
+                except Exception as msg_error:
+                    logging.getLogger().warning("Could not show success message: %s", str(msg_error))
+
+            except BaseException as e:
+                logging.getLogger().exception("Error saving snapshot: %s", str(e))
+                # Show error message
+                try:
+                    qt_import.QMessageBox.critical(
+                        self,
+                        "Save Error",
+                        f"Failed to save snapshot:\n{str(e)}"
+                    )
+                except Exception as msg_error:
+                    logging.getLogger().warning("Could not show error message: %s", str(msg_error))
+
+        except BaseException as e:
+            logging.getLogger().exception("Error in snapshot operation: %s", str(e))
+        finally:
+            # Always reset the flag
+            self._snapshot_in_progress = False
+            logging.getLogger().info("Snapshot operation completed, flag reset")
 
     def accept_clicked(self):
         colors.set_widget_color(self.accept_button, self.standard_color)
         self.reject_button.setEnabled(False)
         HWR.beamline.sample_view.accept_centring()
+
+        if (
+            HWR.beamline.queue_manager.is_executing()
+            and HWR.beamline.queue_manager.is_paused()
+        ):
+            HWR.beamline.queue_manager.set_pause(False)
 
     def reject_clicked(self):
         colors.set_widget_color(self.accept_button, self.standard_color)
@@ -286,7 +392,8 @@ class MonoStateButton(qt_import.QToolButton):
     def __init__(self, parent, caption=None, icon=None):
 
         qt_import.QToolButton.__init__(self, parent)
-        self.setSizePolicy(qt_import.QSizePolicy.Expanding, qt_import.QSizePolicy.Fixed)
+        self.setSizePolicy(qt_import.QSizePolicy.Expanding,
+                           qt_import.QSizePolicy.Fixed)
         self.setToolButtonStyle(qt_import.Qt.ToolButtonTextUnderIcon)
         if caption:
             self.setText(caption)
@@ -308,7 +415,8 @@ class DuoStateButton(qt_import.QToolButton):
         self.stop_icon = None
         self.standard_color = self.palette().color(qt_import.QPalette.Window)
         self.setText(caption)
-        self.setSizePolicy(qt_import.QSizePolicy.Expanding, qt_import.QSizePolicy.Fixed)
+        self.setSizePolicy(qt_import.QSizePolicy.Expanding,
+                           qt_import.QSizePolicy.Fixed)
         self.clicked.connect(self.button_clicked)
 
     def set_icons(self, icon_run, icon_stop):
@@ -325,7 +433,8 @@ class DuoStateButton(qt_import.QToolButton):
         #    self.setEnabled(False)
 
     def command_started(self):
-        colors.set_widget_color(self, colors.LIGHT_YELLOW, qt_import.QPalette.Button)
+        colors.set_widget_color(self, colors.LIGHT_YELLOW,
+                                qt_import.QPalette.Button)
         if self.stop_icon is not None:
             self.setIcon(self.stop_icon)
         self.executing = True
@@ -336,10 +445,12 @@ class DuoStateButton(qt_import.QToolButton):
 
     def command_done(self):
         self.executing = False
-        colors.set_widget_color(self, self.standard_color, qt_import.QPalette.Button)
+        colors.set_widget_color(self, self.standard_color,
+                                qt_import.QPalette.Button)
         if self.run_icon is not None:
             self.setIcon(self.run_icon)
         self.setEnabled(True)
 
     def command_failed(self):
         self.command_done()
+

@@ -339,7 +339,7 @@ class ProposalBrick(BaseWidget):
     # Sets the current session; changes from login mode to logout mode
     def set_proposal(self, proposal, session):
         logging.getLogger("ACCEPTING proposal %s - session is %s" % (str(proposal), str(session)))
-        #HWR.beamline.lims.enable()
+        HWR.beamline.lims.enable()
         HWR.beamline.session.proposal_code = proposal["code"]
         HWR.beamline.session.session_id = session["sessionId"]
         HWR.beamline.session.proposal_id = proposal["proposalId"]
@@ -360,7 +360,7 @@ class ProposalBrick(BaseWidget):
             logging.getLogger().warning(
                 "Using local login: the data collected won't be stored in the database"
             )
-            #HWR.beamline.lims.disable()
+            HWR.beamline.lims.disable()
             self.loggedIn.emit(False)
         else:
             msg = "Results in ISPyB will be stored under proposal %s%s - '%s'" % (
@@ -598,7 +598,7 @@ class ProposalBrick(BaseWidget):
     ):
         # Get proposal and sessions
         logging.getLogger("HWR").debug("ProposalBrick: querying ISPyB database...")
-        prop = HWR.beamline.lims.get_proposal(proposal_code, proposal_number)
+        prop = HWR.beamline.lims.getProposal(proposal_code, proposal_number)
 
         # Check if everything went ok
         prop_ok = True
@@ -637,7 +637,6 @@ class ProposalBrick(BaseWidget):
         # person = selected_proposal['Person']
         # laboratory = selected_proposal['Laboratory']
         sessions = selected_proposal["Session"]
-
         # Check if there are sessions in the proposal
         todays_session = None
         if sessions is None or len(sessions) == 0:
@@ -697,8 +696,7 @@ class ProposalBrick(BaseWidget):
             new_session_dict["scheduled"] = 0
             new_session_dict["nbShifts"] = 3
             new_session_dict["comments"] = "Session created by MXCuBE"
-            session_manager = HWR.beamline.lims.create_session(new_session_dict)
-            session_id = session_manager.sessions[0].session_id
+            session_id = HWR.beamline.lims.create_session(new_session_dict)
             new_session_dict["sessionId"] = session_id
 
             todays_session = new_session_dict

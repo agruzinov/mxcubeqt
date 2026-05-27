@@ -641,6 +641,30 @@ class CustomTabWidget(qt_import.QTabWidget):
                     self.removeTab(self.indexOf(page["widget"]))
                     self.repaint()
                     page["hidden"] = True
+                    # If a tab was closed manually, ensure bricks that
+                    # reference this page update their state (for example
+                    # TreeBrick.current_view and the details button text).
+                    try:
+                        for w in qt_import.QApplication.allWidgets():
+                            # detect widgets that own a sample_changer_widget
+                            if hasattr(w, "sample_changer_widget"):
+                                try:
+                                    # clear current_view if it pointed to the
+                                    # sample changer view that was just closed
+                                    if getattr(w, "current_view", None) == getattr(w, "sample_changer_widget", None):
+                                        w.current_view = None
+                                    # set the details button text according to
+                                    # the configured mount method
+                                    sample_method = getattr(getattr(w, "dc_tree_widget", None), "sample_mount_method", 1)
+                                    if sample_method == 1:
+                                        w.sample_changer_widget.details_button.setText("Show SC-details")
+                                    else:
+                                        w.sample_changer_widget.details_button.setText("Show Plate-details")
+                                except BaseException:
+                                    # best-effort update; ignore errors
+                                    pass
+                    except BaseException:
+                        pass
             else:
                 if page["hidden"]:
                     if icon:

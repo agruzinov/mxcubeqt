@@ -160,7 +160,7 @@ class CreateAdvancedWidget(CreateTaskBase):
             "Total osc. range per line"
         )
 
-        self._advanced_methods = list(HWR.beamline.config.advanced_methods)
+        self._advanced_methods = list(HWR.beamline.advanced_methods)
         if self._advanced_methods:
             for method in self._advanced_methods:
                 self._advanced_methods_widget.method_combo.addItem(method)
@@ -417,10 +417,10 @@ class CreateAdvancedWidget(CreateTaskBase):
                 )
                 centred_point = grid.get_centred_position()
                 self._acq_widget.acq_widget_layout.kappa_ledit.setText(
-                    "%.2f" % float(centred_point.kappa)
+                    "%.2f" % float(centred_point.kappa or 0.0)
                 )
                 self._acq_widget.acq_widget_layout.kappa_phi_ledit.setText(
-                    "%.2f" % float(centred_point.kappa_phi)
+                    "%.2f" % float(centred_point.kappa_phi or 0.0)
                 )
                 self._advanced_methods_widget.hor_spacing_ledit.setText(
                     "%.2f" % (float(grid_properties["xOffset"]) * 1000)

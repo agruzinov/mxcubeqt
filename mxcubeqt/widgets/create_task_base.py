@@ -105,11 +105,11 @@ class CreateTaskBase(qt_import.QWidget):
         HWR.beamline.beam.connect(
             "beamInfoChanged", self.set_beam_info
         )
-        if hasattr(HWR.beamline.diffractometer, 'kappa'):
+        if hasattr(HWR.beamline.diffractometer, 'kappa') and HWR.beamline.diffractometer.kappa is not None:
             HWR.beamline.diffractometer.kappa.connect(
                 "valueChanged", self.set_kappa
             )
-        if hasattr(HWR.beamline.diffractometer, 'kappa_phi'):
+        if hasattr(HWR.beamline.diffractometer, 'kappa_phi') and HWR.beamline.diffractometer.kappa_phi is not None:
             HWR.beamline.diffractometer.kappa_phi.connect(
                 "valueChanged", self.set_kappa_phi
             )
@@ -475,6 +475,7 @@ class CreateTaskBase(qt_import.QWidget):
 
         elif isinstance(tree_item, queue_item.BasketQueueItem):
             self._path_template = deepcopy(self._path_template)
+            self._acquisition_parameters.centred_position.snapshot_image = None
             self._acquisition_parameters = deepcopy(self._acquisition_parameters)
             # (data_directory, proc_directory) = self.get_default_directory(tree_item)
             # self._path_template.directory = data_directory
